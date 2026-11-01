@@ -1,0 +1,39 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+
+# Dados brutos: baixados de novo a cada execução, nunca versionados
+# (ZIPs e CSVs temporários da ingestão também ficam dentro de data/raw)
+data/raw/
+
+# PDFs da Fenabrave: cache local e do GitHub Actions, nunca versionados nem redistribuídos
+data/pdfs/
+
+# Banco DuckDB local (os marts versionados ficam em data/marts/*.parquet)
+*.duckdb
+*.duckdb.wal
+
+# dbt
+transform/target/
+transform/dbt_packages/
+transform/logs/
+transform/.user.yml
+logs/
+
+# Evidence
+dashboard/node_modules/
+dashboard/.evidence/
+dashboard/build/
+dashboard/static/data/
+
+# Editor / SO
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+.env
+dashboard/.svelte-kit/
+dashboard/**/*.options.yaml

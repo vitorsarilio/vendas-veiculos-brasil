@@ -1,0 +1,13 @@
+# Versões fixas: o pipeline roda sem supervisão toda semana, então nada de atualização surpresa.
+dbt-core==1.12.6
+dbt-duckdb==1.11.0
+duckdb==2.0.0
+requests==2.34.2
+pytest==9.1.1
+
+# Leitura dos PDFs da Fenabrave (pdfplumber é MIT; pdfminer.six fixado para a extração não mudar sozinha)
+pdfplumber==0.11.9
+pdfminer.six==20251230
+
+# O próprio pacote de ingestão (permite `python -m ingestao` de qualquer pasta)
+-e .

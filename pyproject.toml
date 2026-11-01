@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vendas-veiculos-brasil"
+version = "0.1.0"
+description = "Ingestão dos relatórios mensais de emplacamento da Fenabrave (veículos leves, 2003 em diante)"
+requires-python = ">=3.12"
+# As dependências ficam fixadas em requirements.txt
+
+[tool.setuptools.packages.find]
+where = ["ingestion"]
+include = ["ingestao*"]
+
+[tool.pytest.ini_options]
+testpaths = ["ingestion/tests"]
+pythonpath = ["ingestion"]
