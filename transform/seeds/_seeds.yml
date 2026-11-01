@@ -1,0 +1,44 @@
+version: 2
+
+seeds:
+  - name: marcas
+    description: >
+      De-para dos nomes de marca do PDF para um nome padronizado, com o país de origem da
+      marca (não o de fabricação: um Jeep feito em Pernambuco conta como Estados Unidos).
+      Mesma marca com nomes diferentes ao longo do tempo vira uma só: GM e Chevrolet;
+      Chery, Caoa Chery e Rely (submarca da Chery); Chana e Caoa Changan; Great Wall e GWM.
+      Marcas de volume muito pequeno sem origem confirmada ficam como "Não classificado".
+    columns:
+      - name: marca_fonte
+        data_tests: [unique, not_null]
+      - name: marca
+        data_tests: [not_null]
+      - name: pais_origem
+        data_tests: [not_null]
+
+  - name: categorias
+    description: >
+      Nome legível de cada categoria de modelos da Fenabrave e o agrupamento por carroceria.
+      A Fenabrave conta SUVs e picapes por categoria própria, então dá para acompanhar a
+      troca de hatches e sedãs por SUVs ao longo dos anos.
+    data_tests:
+      - quantidade_linhas_entre:
+          arguments:
+            minimo: 17
+            maximo: 17
+    columns:
+      - name: categoria_fonte
+        data_tests: [unique, not_null]
+      - name: categoria
+        data_tests: [unique, not_null]
+      - name: carroceria
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [Hatch, Sedã, Perua, Minivan, Esportivo, SUV, Picape, Furgão]
+      - name: segmento
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [automoveis, comerciais_leves]

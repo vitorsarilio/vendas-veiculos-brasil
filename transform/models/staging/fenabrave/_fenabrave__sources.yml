@@ -1,0 +1,24 @@
+version: 2
+
+sources:
+  - name: fenabrave
+    description: >
+      Tabelas extraídas dos relatórios mensais "Informativo - Emplacamentos" da Fenabrave
+      (dados do Renavam/Senatran), um PDF por mês desde jan/2003. Tudo chega como texto,
+      fiel ao PDF; a coluna `origem` diz como cada linha foi obtida.
+    config:
+      external_location: "{{ env_var('RAW_DIR', '../data/raw') }}/{name}.parquet"
+      # O relatório do mês M sai no início de M+1. "Atualizado" = fim do último mês publicado.
+      loaded_at_field: "cast(mes || '-01' as timestamp) + interval 1 month"
+      freshness:
+        warn_after: {count: 45, period: day}
+        error_after: {count: 75, period: day}
+    tables:
+      - name: fenabrave_segmentos
+        description: Resumo mensal por segmento (automóveis, comerciais leves e o total de leves).
+      - name: fenabrave_marcas
+        description: Ranking de marcas do mês por segmento (top ~20; as demais ficam de fora).
+      - name: fenabrave_modelos
+        description: Modelos por categoria (hatch, sedã, SUV, picape…), com mês anterior, mês e acumulado do ano.
+      - name: fenabrave_canal
+        description: Participação de varejo e de venda direta no mês, em %, por segmento.

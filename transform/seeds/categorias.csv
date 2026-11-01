@@ -1,0 +1,18 @@
+categoria_fonte,categoria,carroceria,segmento
+Veículos de Entrada,Entrada,Hatch,automoveis
+Hatch Pequenos,Hatch pequeno,Hatch,automoveis
+Hatch Médios,Hatch médio,Hatch,automoveis
+Sedans Compactos,Sedã compacto,Sedã,automoveis
+Sedans Pequenos,Sedã pequeno,Sedã,automoveis
+Sedans médios,Sedã médio,Sedã,automoveis
+Sedans Grandes,Sedã grande,Sedã,automoveis
+Sw Médios,Perua média,Perua,automoveis
+Sw Grandes,Perua grande,Perua,automoveis
+Monocab,Monovolume,Minivan,automoveis
+Grandcab,Minivan,Minivan,automoveis
+Sports,Esportivo,Esportivo,automoveis
+Suv's,SUV,SUV,automoveis
+Pick-up's Pequenas,Picape pequena,Picape,comerciais_leves
+Pick-up's Grandes,Picape grande,Picape,comerciais_leves
+Furgões Pequenos,Furgão pequeno,Furgão,comerciais_leves
+Furgões,Furgão,Furgão,comerciais_leves

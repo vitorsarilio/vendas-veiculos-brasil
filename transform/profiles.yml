@@ -1,0 +1,11 @@
+# Rode o dbt de dentro da pasta transform/ (o dbt acha este arquivo sozinho).
+# Sem segredos: o banco é um arquivo DuckDB local, fora do git.
+vendas_veiculos:
+  target: local
+  outputs:
+    local:
+      type: duckdb
+      path: "{{ env_var('DUCKDB_PATH', '../data/vendas_veiculos.duckdb') }}"
+      # Modelos com materialized='external' (os marts) viram Parquet nesta pasta
+      external_root: "{{ env_var('MARTS_DIR', '../data/marts') }}"
+      threads: 4

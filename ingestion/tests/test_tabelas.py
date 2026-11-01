@@ -138,3 +138,11 @@ def test_sem_automoveis_e_com_comerciais_cortado_falha():
     )
     with pytest.raises(tabelas.TabelaNaoEncontrada):
         tabelas.ranking_marcas([pagina])
+
+
+def test_cabecalho_com_letras_dobradas_nao_vira_categoria():
+    pagina = PaginaFalsa(11, CABECALHO + [
+        "Modelos mais emplacados acumulado até Jan/2022", "AUTOMÓVEIS", "Hatch Pequenos",
+        "DDeezz JJaann AAccuummuullaaddoo", "1º VW/POLO 10.196 17.999 111.242 23,40%",
+    ])
+    assert tabelas.modelos_por_categoria([pagina])[0]["categoria"] == "Hatch Pequenos"

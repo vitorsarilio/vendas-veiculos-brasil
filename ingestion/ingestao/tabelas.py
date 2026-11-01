@@ -155,6 +155,17 @@ _IGNORAR = re.compile(
 _SEGMENTO_TITULO = {"automoveis": "automoveis", "comerciais leves": "comerciais_leves"}
 
 
+def _letras_dobradas(linha: str) -> bool:
+    """Cabeçalho em negrito "impresso duas vezes" (jan/2022): 'DDeezz JJaann AAccuummuullaaddoo'."""
+    letras = linha.replace(" ", "")
+    return len(letras) >= 6 and len(letras) % 2 == 0 and all(letras[i] == letras[i + 1] for i in range(0, len(letras), 2))
+
+
+def _eh_categoria(chave: str, linha: str) -> bool:
+    return (not _IGNORAR.match(chave) and re.search(r"[a-z]", chave) is not None
+            and not re.search(r"\d", chave) and not _letras_dobradas(linha))
+
+
 def _separar_linha_de_modelo(linha: str) -> dict | None:
     """'3º FORD/KA SEDAN 0,00 0,00 = 5 0,01%' → posição, modelo e as três colunas de quantidade.
 
@@ -209,11 +220,10 @@ def modelos_por_categoria(paginas: list[Pagina]) -> list[dict]:
             if modelo:
                 if categoria is None:
                     raise TabelaNaoEncontrada(f"categoria antes do modelo {modelo['modelo']} (página {pagina.numero})")
-                resultado.append({"segmento": segmento, "categoria": linha_categoria, **modelo})
+                resultado.append({"segmento": segmento, "categoria": categoria, **modelo})
                 continue
-            if not _IGNORAR.match(chave) and re.search(r"[a-z]", chave) and not re.search(r"\d", chave):
-                categoria = chave
-                linha_categoria = linha
+            if _eh_categoria(chave, linha):
+                categoria = linha
     if not resultado:
         raise TabelaNaoEncontrada("modelos mais emplacados por categoria")
     return resultado
@@ -235,7 +245,7 @@ def totais_por_categoria(paginas: list[Pagina]) -> list[dict]:
                 if categoria and len(numeros) >= 3:
                     totais.append({"categoria": categoria, "mes_anterior": numeros[0], "mes_atual": numeros[1], "acumulado_ano": numeros[2]})
                 continue
-            if not _IGNORAR.match(chave) and re.search(r"[a-z]", chave) and not re.search(r"\d", chave):
+            if _eh_categoria(chave, linha):
                 categoria = linha
     return totais
 

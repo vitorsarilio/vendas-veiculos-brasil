@@ -1,0 +1,30 @@
+name: vendas_veiculos
+version: "1.0.0"
+config-version: 2
+profile: vendas_veiculos
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+models:
+  vendas_veiculos:
+    staging:
+      # Views sobre os Parquet de data/raw: tipagem, nomes e limpeza, 1 modelo por tabela da fonte
+      +materialized: view
+    intermediate:
+      +materialized: view
+    marts:
+      # Cada mart vira data/marts/<nome>.parquet (versionado e lido pelo Evidence)
+      +materialized: external
+      +format: parquet
+
+seeds:
+  vendas_veiculos:
+    marcas:
+      +column_types: {marca_fonte: varchar, marca: varchar, pais_origem: varchar}
+    categorias:
+      +column_types: {categoria_fonte: varchar, categoria: varchar, carroceria: varchar, segmento: varchar}

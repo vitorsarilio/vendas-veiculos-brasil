@@ -1,0 +1,113 @@
+version: 2
+
+models:
+  - name: stg_fenabrave__segmentos
+    description: Emplacamentos do mês por segmento (automóveis, comerciais leves e leves = soma dos dois).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [mes_referencia, segmento]
+    columns:
+      - name: mes_referencia
+        data_tests: [not_null]
+      - name: segmento
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [automoveis, comerciais_leves, leves]
+      - name: emplacamentos
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+      - name: origem
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [texto_pdf, reconstruido_dos_vizinhos]
+
+  - name: stg_fenabrave__marcas
+    description: Ranking de marcas do mês por segmento, com o nome como aparece no PDF.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [mes_referencia, segmento, marca_fonte]
+    columns:
+      - name: marca_fonte
+        data_tests:
+          - not_null
+          # Marca nova sem de-para: alerta, sem derrubar o pipeline (cai em "Não classificado")
+          - relationships:
+              arguments:
+                to: ref('marcas')
+                field: marca_fonte
+              config:
+                severity: warn
+      - name: emplacamentos
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+      - name: participacao_pct
+        data_tests:
+          - proporcao_nulos_maxima:
+              arguments:
+                maximo: 0.01
+
+  - name: stg_fenabrave__modelos
+    description: Modelos mais emplacados por categoria, no mês.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [mes_referencia, categoria_fonte, modelo_fonte]
+    columns:
+      - name: categoria_fonte
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('categorias')
+                field: categoria_fonte
+      - name: marca_fonte
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('marcas')
+                field: marca_fonte
+              config:
+                severity: warn
+      - name: modelo
+        data_tests: [not_null]
+      - name: emplacamentos
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+
+  - name: stg_fenabrave__canal
+    description: Participação de varejo e de venda direta no mês, em pontos percentuais.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [mes_referencia, segmento]
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "abs(venda_direta_pct + varejo_pct - 100) <= 0.11"
+    columns:
+      - name: venda_direta_pct
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 100
+      - name: origem
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [texto_pdf, imagem_ocr, imagem_ocr_complemento, imagem_texto_sobreposto, imagem_leitura_manual]
