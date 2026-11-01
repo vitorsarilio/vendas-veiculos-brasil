@@ -1,0 +1,78 @@
+version: 2
+
+# Todos os marts viram data/marts/<nome>.parquet. Segmentos: automoveis, comerciais_leves
+# e leves (= automóveis + comerciais leves). Percentuais em pontos percentuais (0 a 100).
+
+models:
+  - name: mart_emplacamentos_resumo
+    description: Uma linha com os números de destaque do último mês publicado.
+    data_tests:
+      - quantidade_linhas_entre:
+          arguments: { minimo: 1, maximo: 1 }
+    columns:
+      - name: ultimo_mes
+        data_tests: [not_null]
+      - name: emplacamentos_ultimo_mes
+        data_tests: [not_null]
+      - name: marca_lider_ultimo_mes
+        data_tests: [not_null]
+
+  - name: fct_emplacamentos_mensal
+    description: >
+      Pergunta 1 e 2. Emplacamentos por mês e segmento desde jan/2003, com variação sobre o
+      mesmo mês do ano anterior, média móvel de 12 meses e varejo × venda direta.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments: { combination_of_columns: [mes_referencia, segmento] }
+    columns:
+      - name: emplacamentos
+        data_tests: [not_null]
+      - name: emplacamentos_venda_direta
+        description: Estimativa (% publicado × total do segmento). Nula em out/2003 e mar/2005.
+
+  - name: mart_emplacamentos_anual
+    description: Pergunta 1 e 2. Totais por ano e segmento; o ano corrente vem com ano_parcial = true.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments: { combination_of_columns: [ano, segmento] }
+    columns:
+      - name: variacao_ano_anterior_pct
+        description: Compara com os mesmos meses do ano anterior (no ano parcial, só os meses já publicados).
+      - name: canal_incompleto
+        description: True em 2003 e 2005, que têm um mês sem a página de varejo × venda direta.
+
+  - name: mart_emplacamentos_sazonalidade
+    description: Pergunta 1. Peso típico de cada mês (mediana dos anos completos; 1,00 = mês médio).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments: { combination_of_columns: [segmento, mes_do_ano] }
+      - quantidade_linhas_entre:
+          arguments: { minimo: 36, maximo: 36 }
+
+  - name: mart_emplacamentos_marcas
+    description: >
+      Pergunta 3. Emplacamentos, participação e posição por ano, segmento e marca padronizada.
+      "Outras" reúne o que ficou fora do top ~20 de cada mês.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments: { combination_of_columns: [ano, segmento, marca] }
+
+  - name: mart_emplacamentos_origem
+    description: Pergunta 3. Participação por origem da marca (China, Europa, Japão e Coreia, EUA…), por ano.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments: { combination_of_columns: [ano, segmento, origem] }
+
+  - name: mart_emplacamentos_modelos_top
+    description: >
+      Pergunta 4. Top 10 modelos de cada ano (no total de leves e em cada segmento).
+      Emplacamentos de um ano são um piso (o modelo pode ter ficado fora da lista em algum mês).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments: { combination_of_columns: [ano, segmento, modelo_completo] }
+
+  - name: mart_emplacamentos_carroceria
+    description: Pergunta 4. Emplacamentos e participação por tipo de carroceria (hatch, sedã, SUV, picape…) e ano.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments: { combination_of_columns: [ano, segmento, carroceria] }

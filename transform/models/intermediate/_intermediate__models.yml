@@ -1,0 +1,31 @@
+version: 2
+
+models:
+  - name: int_emplacamentos__mensal
+    description: Emplacamentos por mês e segmento, com varejo e venda direta em unidades (% × total).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments: { combination_of_columns: [mes_referencia, segmento] }
+    columns:
+      - name: venda_direta_pct
+        description: Nulo só nos 2 meses de edição resumida (out/2003 e mar/2005).
+        data_tests:
+          - proporcao_nulos_maxima:
+              arguments: { maximo: 0.01 }
+
+  - name: int_emplacamentos__marcas
+    description: Emplacamentos por mês, segmento e marca padronizada, com a linha "Outras".
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments: { combination_of_columns: [mes_referencia, segmento, marca] }
+    columns:
+      - name: emplacamentos
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments: { min_value: 0 }
+
+  - name: int_emplacamentos__modelos
+    description: Emplacamentos por mês e modelo, com categoria, carroceria e marca padronizadas.
+    columns:
+      - name: carroceria
+        data_tests: [not_null]
