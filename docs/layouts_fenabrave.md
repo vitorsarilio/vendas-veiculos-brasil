@@ -38,6 +38,6 @@ O caderno de automóveis e comerciais leves sempre vem nas primeiras páginas:
 
 O site diz "© Fenabrave – Todos os direitos reservados", e os PDFs não trazem aviso sobre reprodução. O projeto publica só agregados derivados, cita a fonte e não redistribui os PDFs (o cache fica fora do git).
 
-## Pendente para o Passo 1
+## Download a partir do GitHub Actions
 
-Testar o download (API e PDF) a partir de um runner do GitHub Actions.
+Testado em 01/11/2026 (execução 41357315463): a lista oficial (2003 e 2026) e dois PDFs (2003 e 2026) baixaram normalmente de um runner `ubuntu-latest`. A automação semanal é viável.
