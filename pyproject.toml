@@ -13,6 +13,9 @@ requires-python = ">=3.12"
 where = ["ingestion"]
 include = ["ingestao*"]
 
+[tool.setuptools.package-data]
+ingestao = ["dados/*.csv"]
+
 [tool.pytest.ini_options]
 testpaths = ["ingestion/tests"]
 pythonpath = ["ingestion"]
