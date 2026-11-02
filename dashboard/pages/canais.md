@@ -3,6 +3,27 @@ title: Canais
 sidebar_position: 2
 ---
 
+```sql anos_crescente
+select distinct cast(ano as integer) as ano from veiculos.anual order by ano
+```
+
+```sql anos_decrescente
+select distinct cast(ano as integer) as ano from veiculos.anual order by ano desc
+```
+
+<Dropdown data={anos_crescente} name=ano_inicio value=ano title="De" />
+<Dropdown data={anos_decrescente} name=ano_fim value=ano title="Até" />
+<ButtonGroup name=segmento title="Segmento (gráficos de unidades e mês a mês)">
+    <ButtonGroupItem valueLabel="Leves" value="leves" default />
+    <ButtonGroupItem valueLabel="Automóveis" value="automoveis" />
+    <ButtonGroupItem valueLabel="Comerciais leves" value="comerciais_leves" />
+</ButtonGroup>
+
+```sql no_periodo
+select * from ${anual}
+where ano between ${inputs.ano_inicio.value} and ${inputs.ano_fim.value}
+```
+
 ```sql anual
 select
     cast(ano as integer)                as ano,
@@ -15,10 +36,10 @@ from veiculos.anual
 order by ano
 ```
 
-```sql leves_anual_unidades
-select ano, 'Venda direta' as canal, emplacamentos_venda_direta as emplacamentos from ${anual} where segmento = 'leves'
+```sql unidades_por_canal
+select ano, 'Venda direta' as canal, emplacamentos_venda_direta as emplacamentos from ${no_periodo} where segmento = '${inputs.segmento}'
 union all
-select ano, 'Varejo', emplacamentos_varejo from ${anual} where segmento = 'leves'
+select ano, 'Varejo', emplacamentos_varejo from ${no_periodo} where segmento = '${inputs.segmento}'
 order by ano, canal desc
 ```
 
@@ -27,7 +48,7 @@ select
     ano,
     case segmento when 'automoveis' then 'Automóveis' when 'comerciais_leves' then 'Comerciais leves' else 'Total de leves' end as segmento,
     venda_direta
-from ${anual}
+from ${no_periodo}
 order by ano, segmento
 ```
 
@@ -43,7 +64,8 @@ select
     mes_referencia + interval 12 hour   as mes,
     venda_direta_pct / 100              as venda_direta
 from veiculos.mensal
-where segmento = 'leves' and venda_direta_pct is not null
+where segmento = '${inputs.segmento}' and venda_direta_pct is not null
+  and cast(ano as integer) between ${inputs.ano_inicio.value} and ${inputs.ano_fim.value}
 order by mes_referencia
 ```
 
@@ -68,14 +90,14 @@ A venda direta foi de <Value data={destaques} column=em_2012 fmt=pct0 /> dos lev
 />
 
 <BarChart
-    data={leves_anual_unidades}
+    data={unidades_por_canal}
     x=ano
     xFmt='0'
     y=emplacamentos
     series=canal
     sort=false
     yFmt='#,##0'
-    title="Veículos leves por canal (unidades estimadas)"
+    title="Emplacamentos por canal (unidades estimadas)"
     colorPalette={['#d1495b', '#1d4e89']}
 />
 
@@ -84,7 +106,7 @@ A venda direta foi de <Value data={destaques} column=em_2012 fmt=pct0 /> dos lev
     x=mes
     y=venda_direta
     yFmt=pct0
-    title="Venda direta mês a mês (total de leves)"
+    title="Venda direta mês a mês"
 />
 
 <Alert status="info">

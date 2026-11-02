@@ -19,7 +19,8 @@ mes, total = duckdb.sql(\"select strftime(ultimo_mes, '%m/%Y'), emplacamentos_ul
 print(f'{mes} ({total:,} emplacamentos de leves)'.replace(',', '.'))
 ")
 
-git add data/marts/*.parquet
+# -A: registra também marts apagados ou renomeados
+git add -A data/marts
 
 if ! git diff --cached --quiet; then
     mensagem="Atualiza marts até o relatório da Fenabrave de ${resumo}"

@@ -1,7 +1,9 @@
 name: Pipeline semanal
 
-# Agendado: baixa os relatórios novos, roda o dbt, commita os marts e publica o site.
-# Push na main mexendo no dashboard: só reconstrói e publica o site (com os marts já versionados).
+# Baixa os relatórios novos, roda o dbt, commita os marts e publica o site.
+# Roda no agendamento, manualmente e em push na main que mexa no dbt, no dashboard ou no
+# próprio workflow (uma mudança de modelo precisa dos marts novos antes do site).
+# Os commits do robô não disparam workflows, então não há ciclo.
 on:
   schedule:
     # Toda segunda-feira às 09:00 UTC (06:00 em Brasília)
@@ -13,7 +15,8 @@ on:
     branches: [main]
     paths:
       - "dashboard/**"
-      - "data/marts/**"
+      - "transform/**"
+      - "ingestion/**"
       - ".github/workflows/pipeline.yml"
 
 # Nunca duas execuções ao mesmo tempo (as duas tentariam commitar e publicar)
@@ -27,7 +30,6 @@ permissions:
 jobs:
   dados:
     name: Ingestão e dbt
-    if: github.event_name != 'push'
     runs-on: ubuntu-latest
     # Sem cache, a primeira execução baixa ~285 PDFs (~1 GB) do servidor da Fenabrave,
     # com pausa entre eles: passa de 1 hora. Com o cache, leva poucos minutos.
@@ -98,7 +100,10 @@ jobs:
 
       - name: dbt build (modelos e testes)
         working-directory: transform
-        run: dbt build
+        # Apaga os marts antes: um mart renomeado ou removido não deixa arquivo velho para trás
+        run: |
+          rm -f ../data/marts/*.parquet
+          dbt build
 
       - name: Commita os marts
         run: bash scripts/commitar_marts.sh
@@ -106,8 +111,7 @@ jobs:
   site:
     name: Build do site
     needs: dados
-    # Roda depois do job de dados, ou sozinho quando ele é pulado (push na main)
-    if: always() && (needs.dados.result == 'success' || needs.dados.result == 'skipped')
+    if: needs.dados.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

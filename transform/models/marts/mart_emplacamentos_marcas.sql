@@ -26,6 +26,7 @@ select
     m.segmento,
     m.marca,
     m.pais_origem,
+    {{ grupo_origem('m.pais_origem') }}         as origem,
     m.eh_outras,
     m.emplacamentos,
     cast(round(100.0 * m.emplacamentos / t.total, 2) as decimal(5, 2))        as participacao_pct,

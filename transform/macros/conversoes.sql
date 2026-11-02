@@ -27,3 +27,16 @@
 {% macro texto(coluna) -%}
     nullif(trim(replace({{ coluna }}, chr(173), '-')), '')
 {%- endmacro %}
+
+
+{# Agrupamento do país de origem da marca usado no painel (China, Europa, Japão e Coreia…). #}
+{% macro grupo_origem(coluna) -%}
+    case
+        when {{ coluna }} = 'China' then 'China'
+        when {{ coluna }} in ('Japão', 'Coreia do Sul') then 'Japão e Coreia do Sul'
+        when {{ coluna }} in ('Alemanha', 'Itália', 'França', 'Reino Unido', 'Suécia', 'Espanha', 'Romênia') then 'Europa'
+        when {{ coluna }} = 'Estados Unidos' then 'Estados Unidos'
+        when {{ coluna }} = 'Não classificado' then 'Não classificado'
+        else 'Outros países'
+    end
+{%- endmacro %}

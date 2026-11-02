@@ -63,9 +63,9 @@ models:
       - dbt_utils.unique_combination_of_columns:
           arguments: { combination_of_columns: [ano, segmento, origem] }
 
-  - name: mart_emplacamentos_modelos_top
+  - name: mart_emplacamentos_modelos
     description: >
-      Pergunta 4. Top 10 modelos de cada ano (no total de leves e em cada segmento).
+      Pergunta 4. Todos os modelos listados pela Fenabrave, por ano, com posição, categoria, carroceria e origem.
       Emplacamentos de um ano são um piso (o modelo pode ter ficado fora da lista em algum mês).
     data_tests:
       - dbt_utils.unique_combination_of_columns:
