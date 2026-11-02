@@ -83,7 +83,11 @@ def extrair_tudo(relatorios: list[dict], dir_pdfs: Path, processos: int | None =
                 ))
             else:
                 futuros.append(executor.submit(extrair_pdf, dir_pdfs / arquivo_do_mes[mes], mes))
-        resultados = [f.result() for f in futuros]
+        resultados = []
+        for i, futuro in enumerate(futuros, 1):
+            resultados.append(futuro.result())
+            if i % 50 == 0 or i == len(futuros):
+                log.info("Lidos %d de %d relatórios", i, len(futuros))
     for resultado in resultados:
         resultado["arquivo"] = arquivo_do_mes[resultado["mes"]]
         resultado["origem"] = "reconstruido_dos_vizinhos" if resultado["mes"] in MESES_RECONSTRUIDOS else "texto_pdf"
