@@ -1,0 +1,93 @@
+name: CI
+
+# Em PRs (e manualmente): testa tudo, sem commitar nem publicar.
+# Só em pull_request, para não rodar duas vezes por commit (push + PR).
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pipeline:
+    name: Testes, ingestão e dbt
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version-file: .python-version
+          cache: pip
+
+      - name: Instala dependências
+        run: pip install -r requirements.txt
+
+      - name: Testes da ingestão (pytest)
+        run: pytest -q
+
+      - name: Restaura a cópia local dos PDFs
+        # Só restaura: quem grava o cache é o pipeline agendado
+        uses: actions/cache/restore@v6
+        with:
+          path: data/pdfs
+          key: pdfs-
+          restore-keys: pdfs-
+
+      - name: Ingestão (Fenabrave)
+        # Se o portal da Fenabrave estiver instável, tenta de novo após 2 minutos (até 3 vezes)
+        run: |
+          for tentativa in 1 2 3; do
+            python -m ingestao && exit 0
+            if [ "$tentativa" -lt 3 ]; then
+              echo "::warning::Ingestão falhou (tentativa $tentativa de 3); nova tentativa em 2 minutos."
+              sleep 120
+            fi
+          done
+          exit 1
+
+      - name: dbt build (modelos e testes)
+        working-directory: transform
+        run: |
+          dbt deps
+          dbt build
+
+      - name: Marts mudaram em relação aos versionados?
+        # Informativo: com os mesmos relatórios, os Parquet saem idênticos
+        run: git diff --stat --exit-code data/marts || echo "::notice::Marts diferentes dos versionados (relatório novo ou mudança nos modelos)."
+
+      - name: Publica os marts gerados como artefato (para revisar o PR)
+        uses: actions/upload-artifact@v7
+        with:
+          name: marts
+          path: data/marts/*.parquet
+          retention-days: 7
+
+  site:
+    name: Build do site
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+
+      - name: Instala dependências
+        working-directory: dashboard
+        run: npm ci
+
+      - name: Gera o site com os marts versionados
+        working-directory: dashboard
+        run: |
+          npm run sources:strict
+          npm run build:strict

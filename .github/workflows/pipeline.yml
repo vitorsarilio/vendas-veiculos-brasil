@@ -1,0 +1,145 @@
+name: Pipeline semanal
+
+# Agendado: baixa os relatórios novos, roda o dbt, commita os marts e publica o site.
+# Push na main mexendo no dashboard: só reconstrói e publica o site (com os marts já versionados).
+on:
+  schedule:
+    # Toda segunda-feira às 09:00 UTC (06:00 em Brasília)
+    - cron: "0 9 * * 1"
+    # E todo dia entre 2 e 10 de cada mês, quando sai o relatório do mês anterior
+    - cron: "0 12 2-10 * *"
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "dashboard/**"
+      - "data/marts/**"
+      - ".github/workflows/pipeline.yml"
+
+# Nunca duas execuções ao mesmo tempo (as duas tentariam commitar e publicar)
+concurrency:
+  group: pipeline
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  dados:
+    name: Ingestão e dbt
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    # Sem cache, a primeira execução baixa ~285 PDFs (~1 GB) com pausa entre eles
+    timeout-minutes: 60
+    permissions:
+      contents: write # para commitar os marts
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version-file: .python-version
+          cache: pip
+
+      - name: Instala dependências
+        run: pip install -r requirements.txt
+
+      - name: Restaura a cópia local dos PDFs
+        # Os PDFs nunca vão para o git; ficam no cache do Actions entre execuções
+        uses: actions/cache/restore@v6
+        with:
+          path: data/pdfs
+          key: pdfs-
+          restore-keys: pdfs-
+
+      - name: Ingestão (Fenabrave)
+        # Se o portal da Fenabrave estiver instável, tenta de novo após 2 minutos (até 3 vezes).
+        # Uma falha da qualidade também repete; se persistir, nada é commitado nem publicado.
+        run: |
+          for tentativa in 1 2 3; do
+            python -m ingestao && exit 0
+            if [ "$tentativa" -lt 3 ]; then
+              echo "::warning::Ingestão falhou (tentativa $tentativa de 3); nova tentativa em 2 minutos."
+              sleep 120
+            fi
+          done
+          exit 1
+
+      - name: Chave do cache dos PDFs
+        id: chave
+        run: echo "valor=$(python scripts/chave_cache_pdfs.py)" >> "$GITHUB_OUTPUT"
+
+      - name: Salva a cópia local dos PDFs (só se mudou)
+        uses: actions/cache/save@v6
+        with:
+          path: data/pdfs
+          key: ${{ steps.chave.outputs.valor }}
+
+      - name: Instala pacotes do dbt
+        working-directory: transform
+        run: dbt deps
+
+      - name: Verifica se saiu relatório novo
+        # Só alerta: dado velho não deve parar o pipeline nem o commit que mantém o agendamento ativo
+        continue-on-error: true
+        working-directory: transform
+        run: dbt source freshness
+
+      - name: dbt build (modelos e testes)
+        working-directory: transform
+        run: dbt build
+
+      - name: Commita os marts
+        run: bash scripts/commitar_marts.sh
+
+  site:
+    name: Build do site
+    needs: dados
+    # Roda depois do job de dados, ou sozinho quando ele é pulado (push na main)
+    if: always() && (needs.dados.result == 'success' || needs.dados.result == 'skipped')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Pega o commit de marts que o job anterior acabou de fazer
+          ref: ${{ github.ref_name }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+
+      - name: Instala dependências
+        working-directory: dashboard
+        run: npm ci
+
+      - name: Carrega os marts
+        working-directory: dashboard
+        run: npm run sources:strict
+
+      - name: Gera o site estático
+        working-directory: dashboard
+        run: npm run build:strict
+
+      - uses: actions/configure-pages@v6
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: dashboard/build
+
+  publicar:
+    name: Publica no GitHub Pages
+    needs: site
+    if: always() && needs.site.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v5
