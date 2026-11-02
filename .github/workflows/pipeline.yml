@@ -29,8 +29,9 @@ jobs:
     name: Ingestão e dbt
     if: github.event_name != 'push'
     runs-on: ubuntu-latest
-    # Sem cache, a primeira execução baixa ~285 PDFs (~1 GB) com pausa entre eles
-    timeout-minutes: 60
+    # Sem cache, a primeira execução baixa ~285 PDFs (~1 GB) do servidor da Fenabrave,
+    # com pausa entre eles: passa de 1 hora. Com o cache, leva poucos minutos.
+    timeout-minutes: 120
     permissions:
       contents: write # para commitar os marts
     steps:
@@ -53,6 +54,8 @@ jobs:
           restore-keys: pdfs-
 
       - name: Ingestão (Fenabrave)
+        # Limite menor que o do job: se estourar, ainda dá tempo de salvar o cache
+        timeout-minutes: 100
         # Se o portal da Fenabrave estiver instável, tenta de novo após 2 minutos (até 3 vezes).
         # Uma falha da qualidade também repete; se persistir, nada é commitado nem publicado.
         run: |
@@ -67,9 +70,17 @@ jobs:
 
       - name: Chave do cache dos PDFs
         id: chave
-        run: echo "valor=$(python scripts/chave_cache_pdfs.py)" >> "$GITHUB_OUTPUT"
+        # Mesmo se a ingestão falhar, guarda o que já foi baixado (chave própria da execução)
+        if: always()
+        run: |
+          if [ -f data/raw/_manifesto.json ]; then
+            echo "valor=$(python scripts/chave_cache_pdfs.py)" >> "$GITHUB_OUTPUT"
+          else
+            echo "valor=pdfs-parcial-${{ github.run_id }}" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Salva a cópia local dos PDFs (só se mudou)
+        if: always() && steps.chave.outputs.valor != ''
         uses: actions/cache/save@v6
         with:
           path: data/pdfs
