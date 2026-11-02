@@ -13,9 +13,9 @@ select strftime(mes_referencia, '%Y-%m') as mes, strftime(mes_referencia, '%m/%Y
 from veiculos.mensal where segmento = 'leves' order by mes desc
 ```
 
-<Dropdown data={meses_crescente} name=inicio value=mes label=mes_nome order=mes title="De (mês/ano)" />
-<Dropdown data={meses_decrescente} name=fim value=mes label=mes_nome order="mes desc" title="Até (mês/ano)" />
-<ButtonGroup name=segmento title="Segmento (gráficos de unidades e mês a mês)">
+<Dropdown data={meses_crescente} name=inicio value=mes label=mes_nome order=mes title="De" />
+<Dropdown data={meses_decrescente} name=fim value=mes label=mes_nome order="mes desc" title="Até" />
+<ButtonGroup name=segmento>
     <ButtonGroupItem valueLabel="Leves" value="leves" default />
     <ButtonGroupItem valueLabel="Automóveis" value="automoveis" />
     <ButtonGroupItem valueLabel="Comerciais leves" value="comerciais_leves" />
@@ -55,7 +55,7 @@ order by ano, canal desc
 
 ```sql participacao_por_segmento
 select
-    ano,
+    make_date(ano, 7, 1) + interval 12 hour as ano,
     case segmento when 'automoveis' then 'Automóveis' when 'comerciais_leves' then 'Comerciais leves' else 'Total de leves' end as segmento,
     venda_direta
 from ${no_periodo}
@@ -66,37 +66,24 @@ order by ano, segmento
 select
     (select venda_direta from ${anual} where segmento = 'leves' and ano = 2012) as em_2012,
     (select venda_direta from ${anual} where segmento = 'leves' and not ano_parcial order by ano desc limit 1) as ultimo_ano_completo,
-    (select ano from ${anual} where segmento = 'leves' and not ano_parcial order by ano desc limit 1) as ultimo_ano
-```
-
-```sql mensal
-select
-    mes_referencia + interval 12 hour   as mes,
-    venda_direta_pct / 100              as venda_direta
-from veiculos.mensal
-where segmento = '${inputs.segmento}' and venda_direta_pct is not null
-  and strftime(mes_referencia, '%Y-%m') between '${inputs.inicio.value}' and '${inputs.fim.value}'
-order by mes_referencia
+    (select venda_direta from ${anual} where segmento = 'leves' and not ano_parcial order by ano desc limit 1)
+        - (select venda_direta from ${anual} where segmento = 'leves' and ano = 2012) as desde_2012
 ```
 
 ## Varejo × venda direta
 
-A Fenabrave separa os emplacamentos em dois canais:
+Venda direta é o que a montadora fatura direto para locadoras, frotistas, PcD, produtores rurais e governo; o resto é varejo.
 
-- **Varejo**: o consumidor compra na concessionária.
-- **Venda direta**: a montadora fatura direto para o cliente, com condições especiais. São locadoras, frotistas, produtores rurais, taxistas, pessoas com deficiência (PcD) e governo.
-
-A venda direta foi de <Value data={destaques} column=em_2012 fmt=pct0 /> dos leves em 2012 para **<Value data={destaques} column=ultimo_ano_completo fmt=pct0 />** em <Value data={destaques} column=ultimo_ano fmt='0' />. O motor foi o boom das locadoras e da assinatura de carros, que passaram a comprar boa parte da produção.
+<BigValue data={destaques} value=ultimo_ano_completo title="Venda direta no último ano completo" fmt=pct0 comparison=desde_2012 comparisonFmt=pct0 comparisonTitle="pontos desde 2012" />
 
 <LineChart
     data={participacao_por_segmento}
     x=ano
-    xFmt='0'
+    xFmt='yyyy'
     y=venda_direta
     series=segmento
     yFmt=pct0
-    title="Participação da venda direta por ano"
-    subtitle="Comerciais leves sempre tiveram mais venda direta (frotas de empresas e do agro)"
+    title="Venda direta, % dos emplacamentos"
 />
 
 <BarChart
@@ -107,22 +94,12 @@ A venda direta foi de <Value data={destaques} column=em_2012 fmt=pct0 /> dos lev
     series=canal
     sort=false
     yFmt='#,##0'
-    title="Emplacamentos por canal (unidades estimadas)"
+    title="Emplacamentos por canal"
     colorPalette={['#d1495b', '#1d4e89']}
-/>
-
-<LineChart
-    data={mensal}
-    x=mes
-    y=venda_direta
-    yFmt=pct0
-    title="Venda direta mês a mês"
 />
 
 <Alert status="info">
 
-**E o atacado?** Venda no atacado é o que a montadora fatura para as concessionárias, medido pela Anfavea, não pela Fenabrave. A Anfavea não publica essa série para carros num formato que dê para baixar automaticamente, então este painel mostra só o que chega ao cliente final (emplacamento), dividido entre varejo e venda direta.
-
-As unidades por canal são estimadas: a Fenabrave publica o percentual de cada canal, e o painel multiplica pelo total do mês. Até jun/2024 o percentual tem 2 casas decimais (erro de poucas unidades); depois, 1 casa (erro de até ~0,05% do mês). Out/2003 e mar/2005 não têm o dado. [Detalhes na metodologia](/metodologia).
+Atacado (montadora → concessionária) é dado da Anfavea, não da Fenabrave. As unidades por canal são estimadas a partir do percentual publicado. [Metodologia](/metodologia)
 
 </Alert>

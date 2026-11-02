@@ -13,9 +13,9 @@ select strftime(mes_referencia, '%Y-%m') as mes, strftime(mes_referencia, '%m/%Y
 from veiculos.mensal where segmento = 'leves' order by mes desc
 ```
 
-<Dropdown data={meses_crescente} name=inicio value=mes label=mes_nome order=mes title="De (mês/ano)" />
-<Dropdown data={meses_decrescente} name=fim value=mes label=mes_nome order="mes desc" title="Até (mês/ano)" />
-<ButtonGroup name=segmento title="Segmento">
+<Dropdown data={meses_crescente} name=inicio value=mes label=mes_nome order=mes title="De" />
+<Dropdown data={meses_decrescente} name=fim value=mes label=mes_nome order="mes desc" title="Até" />
+<ButtonGroup name=segmento>
     <ButtonGroupItem valueLabel="Leves" value="leves" default />
     <ButtonGroupItem valueLabel="Automóveis" value="automoveis" />
     <ButtonGroupItem valueLabel="Comerciais leves" value="comerciais_leves" />
@@ -68,7 +68,9 @@ select
     (select emplacamentos from ${anual} where not ano_parcial order by emplacamentos desc limit 1) as pico,
     (select emplacamentos from ${anual} where ano = 2016) as em_2016,
     (select emplacamentos from ${anual} where ano = 2016)
-        / (select emplacamentos from ${anual} where not ano_parcial order by emplacamentos desc limit 1) - 1 as queda_ate_2016
+        / (select emplacamentos from ${anual} where not ano_parcial order by emplacamentos desc limit 1) - 1 as queda_ate_2016,
+    1 - (select emplacamentos from ${anual} where ano = 2016)
+        / (select emplacamentos from ${anual} where not ano_parcial order by emplacamentos desc limit 1) as queda
 ```
 
 ```sql variacao_anual
@@ -110,11 +112,9 @@ select
     (select 1 - indice_sazonal from ${sazonalidade} order by indice_sazonal limit 1) as abaixo
 ```
 
-## O tamanho do mercado desde 2003
+## Crises e recuperação
 
-Os textos desta página falam do total de leves desde 2003; os gráficos seguem o segmento e o período escolhidos acima.
-
-O mercado de leves mais que dobrou entre 2003 e o pico de **<Value data={pico_e_vale} column=ano_pico fmt='0' />** (<Value data={pico_e_vale} column=pico fmt='#,##0' /> emplacamentos), puxado por crédito farto e redução de IPI. Na recessão, encolheu <Value data={pico_e_vale} column=queda_ate_2016 fmt=pct0 /> até 2016. A pandemia derrubou 2020, e a recuperação seguinte foi travada pela falta de semicondutores.
+Depois do pico de <Value data={pico_e_vale} column=ano_pico fmt='0' /> o mercado encolheu <Value data={pico_e_vale} column=queda fmt=pct0 /> até 2016 e voltou a cair na pandemia.
 
 <BarChart
     data={variacao_anual}
@@ -125,7 +125,6 @@ O mercado de leves mais que dobrou entre 2003 e o pico de **<Value data={pico_e_
     sort=false
     yFmt=pct0
     title="Variação sobre o ano anterior"
-    subtitle="Com os meses do período escolhido, comparados com os mesmos meses do ano anterior"
     colorPalette={['#2f855a', '#c53030']}
 />
 
@@ -135,8 +134,7 @@ O mercado de leves mais que dobrou entre 2003 e o pico de **<Value data={pico_e_
     y=valor
     series=serie
     yFmt='#,##0'
-    title="Emplacamentos por mês no segmento e período escolhidos"
-    subtitle="Com a média móvel de 12 meses, que tira o efeito da sazonalidade"
+    title="Emplacamentos por mês e média de 12 meses"
 />
 
 ## Automóveis e comerciais leves
@@ -150,23 +148,12 @@ O mercado de leves mais que dobrou entre 2003 e o pico de **<Value data={pico_e_
     sort=false
     yFmt='#,##0'
     title="Emplacamentos por segmento"
-    subtitle="Comerciais leves = picapes e furgões. Cada ano soma só os meses do período escolhido"
-/>
-
-<BarChart
-    data={segmentos_anual}
-    x=ano
-    xFmt='0'
-    y=emplacamentos
-    series=segmento
-    type=stacked100
-    sort=false
-    title="Participação de cada segmento"
+    subtitle="Comerciais leves = picapes e furgões"
 />
 
 ## Sazonalidade
 
-Dezembro concentra compras de fim de ano e de frotas: em um ano típico, **<Value data={meses_extremos} column=mes_forte />** fica <Value data={meses_extremos} column=acima fmt=pct0 /> acima do mês médio. **<Value data={meses_extremos} column=mes_fraco />**, mais curto e com férias e Carnaval, fica <Value data={meses_extremos} column=abaixo fmt=pct0 /> abaixo.
+Em um ano típico, <Value data={meses_extremos} column=mes_forte /> fica <Value data={meses_extremos} column=acima fmt=pct0 /> acima do mês médio e <Value data={meses_extremos} column=mes_fraco /> fica <Value data={meses_extremos} column=abaixo fmt=pct0 /> abaixo.
 
 <BarChart
     data={sazonalidade}
@@ -174,13 +161,5 @@ Dezembro concentra compras de fim de ano e de frotas: em um ano típico, **<Valu
     y=indice_sazonal
     sort=false
     yFmt='#,##0.00'
-    title="Peso de cada mês (1,00 = mês médio do ano)"
-    subtitle="No segmento escolhido; mediana dos anos completos desde 2003"
+    title="Peso de cada mês (1,00 = mês médio)"
 />
-
-<DataTable data={sazonalidade} rows=12>
-    <Column id=mes title="Mês" />
-    <Column id=indice_sazonal title="Índice típico" fmt='#,##0.00' />
-    <Column id=indice_minimo title="Menor" fmt='#,##0.00' />
-    <Column id=indice_maximo title="Maior" fmt='#,##0.00' />
-</DataTable>

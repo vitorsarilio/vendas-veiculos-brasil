@@ -4,10 +4,9 @@ sidebar_position: 3
 ---
 
 <!--
-  Filtros gerais (período, segmento, canal, origem e marca) valem para o comparativo mês a
-  mês e para o ranking do período. O ranking do mês tem o seu próprio seletor de mês.
+  Os filtros valem para a página toda. O período começa nos últimos 12 meses.
   Com um canal escolhido, cada marca é a soma dos seus modelos listados naquele canal
-  (veiculos.modelos_canal). Os textos de destaque usam a série inteira de leves.
+  (veiculos.modelos_canal). Os destaques do fim da página usam a série inteira de leves.
 -->
 
 ```sql meses_crescente
@@ -20,6 +19,12 @@ select strftime(mes_referencia, '%Y-%m') as mes, strftime(mes_referencia, '%m/%Y
 from veiculos.mensal where segmento = 'leves' order by mes desc
 ```
 
+```sql inicio_padrao
+-- Últimos 12 meses
+select strftime(max(mes_referencia) - interval 11 month, '%Y-%m') as mes
+from veiculos.mensal where segmento = 'leves'
+```
+
 ```sql opcoes_origem
 select distinct origem from veiculos.marcas where not eh_outras
 union
@@ -28,8 +33,7 @@ order by origem
 ```
 
 ```sql opcoes_marca
--- Todos os segmentos e canais: algumas marcas só aparecem no ranking de comerciais leves
--- ou nas listas por canal
+-- Algumas marcas só aparecem no ranking de comerciais leves ou nas listas por canal
 select marca, sum(total) as total
 from (
     select marca, sum(emplacamentos) filter (where segmento = 'leves') as total
@@ -41,28 +45,19 @@ group by marca
 order by total desc nulls last, marca
 ```
 
-```sql meses
-select
-    strftime(mes_referencia, '%Y-%m')   as mes,
-    strftime(mes_referencia, '%m/%Y')   as mes_nome
-from veiculos.marcas_mensal
-group by all
-order by mes desc
-```
-
-<Dropdown data={meses_crescente} name=inicio value=mes label=mes_nome order=mes title="De (mês/ano)" />
-<Dropdown data={meses_decrescente} name=fim value=mes label=mes_nome order="mes desc" title="Até (mês/ano)" />
-<ButtonGroup name=segmento title="Segmento">
+<Dropdown data={meses_crescente} name=inicio value=mes label=mes_nome order=mes title="De" defaultValue={inicio_padrao[0]?.mes} />
+<Dropdown data={meses_decrescente} name=fim value=mes label=mes_nome order="mes desc" title="Até" />
+<ButtonGroup name=segmento>
     <ButtonGroupItem valueLabel="Leves" value="leves" default />
     <ButtonGroupItem valueLabel="Automóveis" value="automoveis" />
     <ButtonGroupItem valueLabel="Comerciais leves" value="comerciais_leves" />
 </ButtonGroup>
-<ButtonGroup name=canal title="Canal">
-    <ButtonGroupItem valueLabel="Todos" value="todos" default />
+<ButtonGroup name=canal>
+    <ButtonGroupItem valueLabel="Todos os canais" value="todos" default />
     <ButtonGroupItem valueLabel="Varejo" value="varejo" />
     <ButtonGroupItem valueLabel="Venda direta" value="venda_direta" />
 </ButtonGroup>
-<Dropdown data={opcoes_origem} name=origem value=origem title="Origem da marca" multiple=true selectAllByDefault=true />
+<Dropdown data={opcoes_origem} name=origem value=origem title="Origem" multiple=true selectAllByDefault=true />
 <Dropdown data={opcoes_marca} name=marca value=marca title="Marca" multiple=true selectAllByDefault=true />
 
 ```sql base_mensal
@@ -96,83 +91,54 @@ where segmento = '${inputs.segmento}'
        or mes_referencia in (select distinct mes_referencia from veiculos.modelos_canal))
 ```
 
+```sql periodo
+-- Períodos de mais de 3 anos viram médias anuais nos gráficos de linha
+select
+    date_diff('month', strptime('${inputs.inicio.value}', '%Y-%m'), strptime('${inputs.fim.value}', '%Y-%m')) + 1 as meses,
+    date_diff('month', strptime('${inputs.inicio.value}', '%Y-%m'), strptime('${inputs.fim.value}', '%Y-%m')) + 1 > 36 as anual
+```
+
 ```sql no_periodo
--- Marcas em cada mês entre "De" e "Até"
 select * from ${base_mensal}
 where strftime(mes_referencia, '%Y-%m') between '${inputs.inicio.value}' and '${inputs.fim.value}'
 ```
 
-```sql filtrado
-select * from ${no_periodo}
-where origem in ${inputs.origem.value}
-  and marca in ${inputs.marca.value}
-```
-
 ```sql total_por_ano
--- A participação é sobre o total do segmento (ou do canal), então não muda quando se
--- filtra a origem ou a marca
+-- A participação é sobre o total do segmento (ou do canal): não muda com o filtro de origem ou marca
 select ano, sum(total) as total
 from ${total_mensal}
 where strftime(mes_referencia, '%Y-%m') between '${inputs.inicio.value}' and '${inputs.fim.value}'
 group by ano
 ```
 
-```sql total_periodo
-select sum(total) as total from ${total_por_ano}
-```
-
 ```sql ranking
-select
-    row_number() over (order by sum(f.emplacamentos) desc, f.marca) as posicao,
-    f.marca,
-    f.pais_origem,
-    f.origem,
-    sum(f.emplacamentos)                                    as emplacamentos,
-    sum(f.emplacamentos) / max(t.total)                     as participacao,
-    count(distinct f.mes_referencia)                        as meses
-from ${filtrado} as f
-cross join ${total_periodo} as t
-group by f.marca, f.pais_origem, f.origem
-order by emplacamentos desc
-```
-
-```sql resumo_filtro
-select
-    sum(emplacamentos)          as emplacamentos,
-    sum(participacao)           as participacao,
-    count(*)                    as marcas
-from ${ranking}
-```
-
-```sql ranking_mes
--- Todas as marcas do mês escolhido, com o mesmo mês do ano anterior
-with mes as (
-    select
-        b.*,
-        b.emplacamentos / t.total                               as participacao,
-        row_number() over (order by b.emplacamentos desc, b.marca) as posicao
-    from ${base_mensal} as b
-    join ${total_mensal} as t using (mes_referencia)
-    where strftime(b.mes_referencia, '%Y-%m') = '${inputs.mes.value}'
+-- A posição é entre todas as marcas; a variação compara com os mesmos meses um ano antes
+-- e só aparece em períodos de até 12 meses
+with atual as (
+    select marca, pais_origem, origem, sum(emplacamentos) as emplacamentos
+    from ${no_periodo}
+    group by all
 ),
-ano_anterior as (
-    select marca, emplacamentos
+anterior as (
+    select marca, sum(emplacamentos) as emplacamentos
     from ${base_mensal}
-    where strftime(mes_referencia + interval 1 year, '%Y-%m') = '${inputs.mes.value}'
+    where strftime(mes_referencia + interval 1 year, '%Y-%m') between '${inputs.inicio.value}' and '${inputs.fim.value}'
+    group by marca
+),
+posicoes as (
+    select
+        row_number() over (order by a.emplacamentos desc, a.marca) as posicao,
+        a.*,
+        a.emplacamentos / (select sum(total) from ${total_por_ano}) as participacao,
+        case when (select meses from ${periodo}) <= 12 then p.emplacamentos end as anterior
+    from atual as a
+    left join anterior as p using (marca)
 )
-select
-    m.posicao,
-    m.marca,
-    m.pais_origem,
-    m.emplacamentos,
-    m.participacao,
-    a.emplacamentos                             as mesmo_mes_ano_anterior,
-    m.emplacamentos / a.emplacamentos - 1       as variacao
-from mes as m
-left join ano_anterior as a using (marca)
-where m.origem in ${inputs.origem.value}
-  and m.marca in ${inputs.marca.value}
-order by m.posicao
+select *, emplacamentos / anterior - 1 as variacao
+from posicoes
+where origem in ${inputs.origem.value}
+  and marca in ${inputs.marca.value}
+order by posicao
 ```
 
 ```sql escolhidas
@@ -180,131 +146,116 @@ select distinct marca from ${opcoes_marca} where marca in ${inputs.comparar.valu
 ```
 
 ```sql comparativo
--- Marcas escolhidas em "Comparar marcas"; sem escolha, as 5 maiores do período no filtro
+-- Marcas escolhidas em "Comparar"; sem escolha, as 5 maiores do filtro.
+-- Períodos longos: média mensal de cada ano, para o gráfico não virar um emaranhado.
 with maiores as (select marca from ${ranking} order by posicao limit 5),
 lista as (
     select marca from ${escolhidas}
     union all
     select marca from maiores where (select count(*) from ${escolhidas}) = 0
+),
+pontos as (
+    select
+        case when (select anual from ${periodo}) then make_date(year(mes_referencia), 7, 1)
+             else mes_referencia end + interval 12 hour as mes,
+        mes_referencia,
+        total
+    from ${total_mensal}
+    where strftime(mes_referencia, '%Y-%m') between '${inputs.inicio.value}' and '${inputs.fim.value}'
+),
+totais as (
+    select mes, count(*) as meses, sum(total) as total from pontos group by mes
 )
 select
-    n.mes_referencia + interval 12 hour     as mes,
+    p.mes,
     n.marca,
-    n.emplacamentos,
-    n.emplacamentos / t.total               as participacao
+    sum(n.emplacamentos) / max(t.meses)     as emplacamentos,
+    sum(n.emplacamentos) / max(t.total)     as participacao
 from ${no_periodo} as n
-join ${total_mensal} as t using (mes_referencia)
+join pontos as p using (mes_referencia)
+join totais as t on t.mes = p.mes
 where n.marca in (select marca from lista)
-order by mes, n.marca
+group by all
+order by p.mes, n.marca
 ```
 
 ```sql origem_por_ano
--- As marcas fora das listas entram como "Não classificado"
+-- Série inteira (ignora o período), no segmento e canal escolhidos.
+-- As marcas fora das listas entram como "Outras marcas"
 with marcas as (
     select ano, origem, sum(emplacamentos) as emplacamentos
-    from ${no_periodo}
+    from ${base_mensal}
     group by all
 ),
 fora_do_ranking as (
-    select t.ano, 'Não classificado' as origem, t.total - coalesce(sum(m.emplacamentos), 0) as emplacamentos
-    from ${total_por_ano} as t
+    select t.ano, 'Outras marcas' as origem, t.total - coalesce(sum(m.emplacamentos), 0) as emplacamentos
+    from (select ano, sum(total) as total from ${total_mensal} group by ano) as t
     left join marcas as m using (ano)
     group by t.ano, t.total
 )
-select ano, origem, sum(emplacamentos) as emplacamentos
+select ano, case origem when 'Não classificado' then 'Outras marcas' else origem end as origem, sum(emplacamentos) as emplacamentos
 from (select * from marcas union all select * from fora_do_ranking)
 group by all
 order by ano, origem
 ```
 
-```sql quatro_grandes
-select
-    cast(ano as integer) as ano,
-    sum(participacao_pct) filter (where marca in ('Fiat', 'Volkswagen', 'Chevrolet', 'Ford')) / 100 as quatro_grandes
-from veiculos.marcas
-where segmento = 'leves'
-group by ano
-```
-
-```sql china
-select cast(ano as integer) as ano, participacao_pct / 100 as participacao
-from veiculos.origem
-where segmento = 'leves' and origem = 'China'
-```
-
 ```sql destaques
+with quatro as (
+    select cast(ano as integer) as ano,
+        sum(participacao_pct) filter (where marca in ('Fiat', 'Volkswagen', 'Chevrolet', 'Ford')) / 100 as p
+    from veiculos.marcas where segmento = 'leves' group by ano
+),
+china as (
+    select cast(ano as integer) as ano, participacao_pct / 100 as p
+    from veiculos.origem where segmento = 'leves' and origem = 'China'
+)
 select
-    (select quatro_grandes from ${quatro_grandes} where ano = 2003) as em_2003,
-    (select quatro_grandes from ${quatro_grandes} order by ano desc limit 1) as agora,
-    (select ano from ${quatro_grandes} order by ano desc limit 1) as ano_atual,
-    (select participacao from ${china} order by ano desc limit 1) as china_agora,
-    (select participacao from ${china} where ano = 2020) as china_2020
+    (select p from quatro order by ano desc limit 1)                        as quatro_agora,
+    (select p from quatro order by ano desc limit 1) - (select p from quatro where ano = 2003) as quatro_desde_2003,
+    (select p from china order by ano desc limit 1)                         as china_agora,
+    (select p from china order by ano desc limit 1) - (select p from china where ano = 2020) as china_desde_2020
 ```
 
-<BigValue data={resumo_filtro} value=emplacamentos title="Emplacamentos das marcas no período" fmt='#,##0' />
-<BigValue data={resumo_filtro} value=participacao title="Participação no segmento (ou no canal)" fmt=pct1 />
-<BigValue data={resumo_filtro} value=marcas title="Marcas" fmt='#,##0' />
+## Ranking
 
-## Ranking do mês
-
-<Dropdown data={meses} name=mes value=mes label=mes_nome order="mes desc" title="Mês" />
-
-<DataTable data={ranking_mes} rows=25 search=true>
+<DataTable data={ranking} rows=20 search=true>
     <Column id=posicao title="#" />
     <Column id=marca title="Marca" />
-    <Column id=pais_origem title="País de origem" />
+    <Column id=pais_origem title="Origem" />
     <Column id=emplacamentos title="Emplacamentos" fmt='#,##0' />
     <Column id=participacao title="Participação" fmt=pct1 />
-    <Column id=mesmo_mes_ano_anterior title="Mesmo mês do ano anterior" fmt='#,##0' />
-    <Column id=variacao title="Variação" fmt=pct0 contentType=delta />
+    <Column id=variacao title="vs. ano anterior" fmt=pct0 contentType=delta />
 </DataTable>
 
-## Mês a mês
+## Evolução
 
-Escolha as marcas para comparar. Com a opção "As 5 maiores do período", aparecem as 5 maiores do período e do filtro acima.
-
-<Dropdown data={opcoes_marca} name=comparar value=marca title="Comparar marcas" multiple=true defaultValue={['5 maiores']}>
-    <DropdownOption value="5 maiores" valueLabel="As 5 maiores do período" />
+<Dropdown data={opcoes_marca} name=comparar value=marca title="Comparar" multiple=true defaultValue={['5 maiores']}>
+    <DropdownOption value="5 maiores" valueLabel="5 maiores" />
 </Dropdown>
 
-<LineChart
-    data={comparativo}
-    x=mes
-    y=emplacamentos
-    series=marca
-    yFmt='#,##0'
-    title="Emplacamentos por mês"
-/>
+<Grid cols=2>
+    <LineChart
+        data={comparativo}
+        x=mes
+        y=emplacamentos
+        series=marca
+        yFmt='#,##0'
+        title={periodo[0]?.anual ? 'Emplacamentos (média mensal do ano)' : 'Emplacamentos por mês'}
+    />
+    <LineChart
+        data={comparativo}
+        x=mes
+        y=participacao
+        series=marca
+        yFmt=pct0
+        title="Participação"
+    />
+</Grid>
 
-<LineChart
-    data={comparativo}
-    x=mes
-    y=participacao
-    series=marca
-    yFmt=pct0
-    title="Participação no segmento, por mês"
-/>
+## Quem ganha e quem perde espaço
 
-## Ranking no período
-
-Todas as marcas que apareceram no ranking da Fenabrave no período e no segmento escolhidos. A participação é sobre o total do segmento ou, com um canal escolhido, sobre o total do canal.
-
-<DataTable data={ranking} rows=25 search=true>
-    <Column id=posicao title="#" />
-    <Column id=marca title="Marca" />
-    <Column id=pais_origem title="País de origem" />
-    <Column id=emplacamentos title="Emplacamentos" fmt='#,##0' />
-    <Column id=participacao title="Participação" fmt=pct1 />
-    <Column id=meses title="Meses no ranking" fmt='#,##0' />
-</DataTable>
-
-## A queda das quatro grandes
-
-Fiat, Volkswagen, Chevrolet (GM) e Ford tinham **<Value data={destaques} column=em_2003 fmt=pct0 />** do mercado de leves em 2003. Em <Value data={destaques} column=ano_atual fmt='0' />, as quatro somam <Value data={destaques} column=agora fmt=pct0 />. A Ford deixou de fabricar carros no Brasil em 2021 e hoje vende poucos modelos importados.
-
-## A chegada das chinesas
-
-As marcas chinesas tinham <Value data={destaques} column=china_2020 fmt=pct1 /> do mercado de leves em 2020. Com BYD, GWM, Chery, GAC e Geely, já chegam a **<Value data={destaques} column=china_agora fmt=pct1 />** no ano mais recente. A origem considerada é a da marca, não a da fábrica: um Jeep feito em Pernambuco conta como Estados Unidos.
+<BigValue data={destaques} value=quatro_agora title="Fiat, VW, GM e Ford hoje" fmt=pct0 comparison=quatro_desde_2003 comparisonFmt=pct0 comparisonTitle="pontos desde 2003" />
+<BigValue data={destaques} value=china_agora title="Marcas chinesas hoje" fmt=pct1 comparison=china_desde_2020 comparisonFmt=pct1 comparisonTitle="pontos desde 2020" />
 
 <BarChart
     data={origem_por_ano}
@@ -314,14 +265,19 @@ As marcas chinesas tinham <Value data={destaques} column=china_2020 fmt=pct1 /> 
     series=origem
     type=stacked100
     sort=false
-    title="Participação por origem da marca"
-    subtitle="No segmento e período escolhidos. Não classificado = marcas fora do top 20 de cada mês"
+    title="Participação por origem da marca, desde 2003"
+    seriesColors={{
+        'China': '#c0392b',
+        'Japão e Coreia do Sul': '#e8a33d',
+        'Europa': '#2c6fbb',
+        'Estados Unidos': '#1b3a5c',
+        'Outros países': '#7a9a6b',
+        'Outras marcas': '#c9ccd1'
+    }}
 />
 
 <Alert status="info">
 
-A Fenabrave lista as ~20 maiores marcas de cada mês por segmento; o restante entra em "Outras", que não aparece no ranking. Nomes diferentes da mesma marca foram unificados: GM e Chevrolet; Chery, Caoa Chery e Rely; Chana e Changan; Great Wall e GWM.
-
-**Filtro de canal:** a Fenabrave não publica as marcas com unidades por canal, só os ~50 automóveis e ~40 comerciais leves mais emplacados em cada canal no mês. Com "Varejo" ou "Venda direta", cada marca é a soma dos seus modelos dessas listas: um piso, que cobre de 88% a 100% do canal. As marcas pequenas quase somem, e out/2003, mar/2005 e set/2023 ficam de fora (não têm as listas). A Fenabrave não mede o atacado (venda da montadora para a concessionária), que é dado da Anfavea.
+Com Varejo ou Venda direta, cada marca soma os seus modelos das listas do canal: é um piso, que cobre de 88% a 100% do canal. [Metodologia](/metodologia)
 
 </Alert>

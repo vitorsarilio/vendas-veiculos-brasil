@@ -4,8 +4,8 @@ sidebar_position: 4
 ---
 
 <!--
-  Filtros: o período é escolhido em dois seletores de mês (de/até); os demais aceitam vários
-  valores e começam com tudo marcado. As consultas partem de `base`: com o canal "Todos",
+  Filtros: o período começa nos últimos 12 meses; os demais aceitam vários valores e
+  começam com tudo marcado. As consultas partem de `base`: com o canal "Todos",
   as tabelas por categoria; com um canal, as listas daquele canal (veiculos.modelos_canal).
 -->
 
@@ -60,13 +60,17 @@ select distinct origem from veiculos.modelos_canal
 order by origem
 ```
 
-```sql meses
+```sql inicio_padrao
+-- Últimos 12 meses
+select strftime(max(mes_referencia) - interval 11 month, '%Y-%m') as mes
+from veiculos.mensal where segmento = 'leves'
+```
+
+```sql periodo
+-- Períodos de mais de 3 anos viram médias anuais no gráfico de linha
 select
-    strftime(mes_referencia, '%Y-%m')   as mes,
-    strftime(mes_referencia, '%m/%Y')   as mes_nome
-from veiculos.modelos_mensal
-group by all
-order by mes desc
+    date_diff('month', strptime('${inputs.inicio.value}', '%Y-%m'), strptime('${inputs.fim.value}', '%Y-%m')) + 1 as meses,
+    date_diff('month', strptime('${inputs.inicio.value}', '%Y-%m'), strptime('${inputs.fim.value}', '%Y-%m')) + 1 > 36 as anual
 ```
 
 ```sql opcoes_modelo
@@ -91,10 +95,10 @@ from veiculos.modelos_canal
 where canal = '${inputs.canal}'
 ```
 
-<Dropdown data={meses_crescente} name=inicio value=mes label=mes_nome order=mes title="De (mês/ano)" />
-<Dropdown data={meses_decrescente} name=fim value=mes label=mes_nome order="mes desc" title="Até (mês/ano)" />
-<ButtonGroup name=canal title="Canal">
-    <ButtonGroupItem valueLabel="Todos" value="todos" default />
+<Dropdown data={meses_crescente} name=inicio value=mes label=mes_nome order=mes title="De" defaultValue={inicio_padrao[0]?.mes} />
+<Dropdown data={meses_decrescente} name=fim value=mes label=mes_nome order="mes desc" title="Até" />
+<ButtonGroup name=canal>
+    <ButtonGroupItem valueLabel="Todos os canais" value="todos" default />
     <ButtonGroupItem valueLabel="Varejo" value="varejo" />
     <ButtonGroupItem valueLabel="Venda direta" value="venda_direta" />
 </ButtonGroup>
@@ -102,85 +106,56 @@ where canal = '${inputs.canal}'
 <Dropdown data={opcoes_carroceria} name=carroceria value=carroceria title="Carroceria" multiple=true selectAllByDefault=true />
 <Dropdown data={opcoes_categoria} name=categoria value=categoria title="Categoria" multiple=true selectAllByDefault=true />
 <Dropdown data={opcoes_marca} name=marca value=marca title="Marca" multiple=true selectAllByDefault=true />
-<Dropdown data={opcoes_origem} name=origem value=origem title="Origem da marca" multiple=true selectAllByDefault=true />
+<Dropdown data={opcoes_origem} name=origem value=origem title="Origem" multiple=true selectAllByDefault=true />
 
-```sql filtrado
+```sql filtros
+-- Todos os filtros, menos o período
 select
     cast(ano as integer)        as ano,
     segmento,
-    case segmento when 'automoveis' then 'Automóvel' else 'Comercial leve' end as segmento_nome,
     marca,
-    pais_origem,
-    origem,
     modelo_completo,
     categoria,
     carroceria,
     mes_referencia,
     emplacamentos
 from ${base}
-where strftime(mes_referencia, '%Y-%m') between '${inputs.inicio.value}' and '${inputs.fim.value}'
-  and segmento in ${inputs.segmento.value}
+where segmento in ${inputs.segmento.value}
   and carroceria in ${inputs.carroceria.value}
   and categoria in ${inputs.categoria.value}
   and marca in ${inputs.marca.value}
   and origem in ${inputs.origem.value}
 ```
 
-```sql resumo_filtro
-select
-    sum(emplacamentos)                  as emplacamentos,
-    count(distinct modelo_completo)     as modelos,
-    count(distinct marca)               as marcas
-from ${filtrado}
+```sql filtrado
+select * from ${filtros}
+where strftime(mes_referencia, '%Y-%m') between '${inputs.inicio.value}' and '${inputs.fim.value}'
 ```
 
 ```sql ranking
-select
-    row_number() over (order by sum(emplacamentos) desc, modelo_completo) as posicao,
-    modelo_completo                                 as modelo,
-    marca,
-    arg_max(segmento_nome, emplacamentos)           as segmento,
-    arg_max(categoria, emplacamentos)               as categoria,
-    arg_max(carroceria, emplacamentos)              as carroceria,
-    origem,
-    sum(emplacamentos)                              as emplacamentos,
-    sum(emplacamentos) / sum(sum(emplacamentos)) over () as participacao,
-    count(distinct mes_referencia)                  as meses
-from ${filtrado}
-group by modelo_completo, marca, origem
-order by emplacamentos desc
-```
-
-```sql ranking_mes
--- Todos os modelos listados no mês escolhido (com os filtros), e o mesmo mês do ano anterior
-with mes as (
-    select *
-    from ${base}
-    where strftime(mes_referencia, '%Y-%m') = '${inputs.mes.value}'
-      and segmento in ${inputs.segmento.value}
-      and carroceria in ${inputs.carroceria.value}
-      and categoria in ${inputs.categoria.value}
-      and marca in ${inputs.marca.value}
-      and origem in ${inputs.origem.value}
+-- A variação compara com os mesmos meses um ano antes e só aparece em períodos de até 12 meses
+with atual as (
+    select
+        modelo_completo                             as modelo,
+        arg_max(categoria, emplacamentos)           as categoria,
+        arg_max(carroceria, emplacamentos)          as carroceria,
+        sum(emplacamentos)                          as emplacamentos
+    from ${filtrado}
+    group by modelo_completo
 ),
-ano_anterior as (
-    select modelo_completo, sum(emplacamentos) as emplacamentos
-    from ${base}
-    where strftime(mes_referencia + interval 1 year, '%Y-%m') = '${inputs.mes.value}'
+anterior as (
+    select modelo_completo as modelo, sum(emplacamentos) as emplacamentos
+    from ${filtros}
+    where strftime(mes_referencia + interval 1 year, '%Y-%m') between '${inputs.inicio.value}' and '${inputs.fim.value}'
     group by modelo_completo
 )
 select
-    row_number() over (order by m.emplacamentos desc, m.modelo_completo) as posicao,
-    m.modelo_completo                           as modelo,
-    case m.segmento when 'automoveis' then 'Automóvel' else 'Comercial leve' end as segmento,
-    m.categoria,
-    m.carroceria,
-    m.emplacamentos,
-    m.emplacamentos / sum(m.emplacamentos) over () as participacao,
-    a.emplacamentos                             as mesmo_mes_ano_anterior,
-    m.emplacamentos / a.emplacamentos - 1       as variacao
-from mes as m
-left join ano_anterior as a using (modelo_completo)
+    row_number() over (order by a.emplacamentos desc, a.modelo) as posicao,
+    a.*,
+    a.emplacamentos / sum(a.emplacamentos) over ()  as participacao,
+    a.emplacamentos / case when (select meses from ${periodo}) <= 12 then p.emplacamentos end - 1 as variacao
+from atual as a
+left join anterior as p using (modelo)
 order by posicao
 ```
 
@@ -189,27 +164,39 @@ select distinct modelo from ${opcoes_modelo} where modelo in ${inputs.comparar.v
 ```
 
 ```sql comparativo
--- Modelos escolhidos em "Comparar modelos"; sem escolha, os 5 maiores do período no filtro
+-- Modelos escolhidos em "Comparar"; sem escolha, os 5 maiores do filtro.
+-- Períodos longos: média mensal de cada ano, para o gráfico não virar um emaranhado.
 with maiores as (select modelo from ${ranking} order by posicao limit 5),
 lista as (
     select modelo from ${escolhidos}
     union all
     select modelo from maiores where (select count(*) from ${escolhidos}) = 0
-)
+),
+pontos as (
+    select
+        case when (select anual from ${periodo}) then make_date(year(mes_referencia), 7, 1)
+             else mes_referencia end + interval 12 hour as mes,
+        mes_referencia
+    from veiculos.mensal
+    where segmento = 'leves'
+      and strftime(mes_referencia, '%Y-%m') between '${inputs.inicio.value}' and '${inputs.fim.value}'
+),
+meses as (select mes, count(*) as meses from pontos group by mes)
 select
-    mes_referencia + interval 12 hour   as mes,
-    modelo_completo                     as modelo,
-    sum(emplacamentos)                  as emplacamentos
-from ${base}
-where strftime(mes_referencia, '%Y-%m') between '${inputs.inicio.value}' and '${inputs.fim.value}'
-  and modelo_completo in (select modelo from lista)
+    p.mes,
+    b.modelo_completo                       as modelo,
+    sum(b.emplacamentos) / max(m.meses)     as emplacamentos
+from ${base} as b
+join pontos as p using (mes_referencia)
+join meses as m on m.mes = p.mes
+where b.modelo_completo in (select modelo from lista)
 group by all
-order by mes, modelo
+order by p.mes, modelo
 ```
 
 ```sql carroceria_por_ano
 select ano, carroceria, sum(emplacamentos) as emplacamentos
-from ${filtrado}
+from ${filtros}
 group by all
 order by ano, carroceria
 ```
@@ -221,61 +208,39 @@ select
     max(emplacamentos)                          as emplacamentos
 from (
     select ano, modelo_completo, sum(emplacamentos) as emplacamentos
-    from ${filtrado}
+    from ${filtros}
     group by all
 )
 group by ano
-order by ano
+order by ano desc
 ```
 
 ```sql suv
+with s as (
+    select cast(ano as integer) as ano, participacao_nos_leves_pct / 100 as p, ano_incompleto
+    from veiculos.carroceria where carroceria = 'SUV'
+)
 select
-    (select participacao_nos_leves_pct / 100 from veiculos.carroceria where carroceria = 'SUV' and ano = 2010) as em_2010,
-    (select participacao_nos_leves_pct / 100 from veiculos.carroceria where carroceria = 'SUV' and not ano_incompleto order by ano desc limit 1) as agora,
-    (select cast(cast(ano as integer) as varchar) from veiculos.carroceria where carroceria = 'SUV' and not ano_incompleto order by ano desc limit 1) as ano_agora
+    (select p from s where not ano_incompleto order by ano desc limit 1) as agora,
+    (select p from s where not ano_incompleto order by ano desc limit 1) - (select p from s where ano = 2010) as desde_2010
 ```
 
-<BigValue data={resumo_filtro} value=emplacamentos title="Emplacamentos no filtro" fmt='#,##0' />
-<BigValue data={resumo_filtro} value=modelos title="Modelos" fmt='#,##0' />
-<BigValue data={resumo_filtro} value=marcas title="Marcas" fmt='#,##0' />
+## Ranking
 
-## Todos os modelos do período
-
-Todos os modelos listados pela Fenabrave no período e nos filtros escolhidos (no canal escolhido, se houver). Use a busca da tabela para achar um modelo pelo nome.
-
-<DataTable data={ranking} rows=25 search=true>
+<DataTable data={ranking} rows=20 search=true>
     <Column id=posicao title="#" />
     <Column id=modelo title="Modelo" />
-    <Column id=segmento title="Segmento" />
     <Column id=categoria title="Categoria" />
     <Column id=carroceria title="Carroceria" />
-    <Column id=origem title="Origem" />
     <Column id=emplacamentos title="Emplacamentos" fmt='#,##0' />
     <Column id=participacao title="Participação" fmt=pct1 />
-    <Column id=meses title="Meses listado" fmt='#,##0' />
+    <Column id=variacao title="vs. ano anterior" fmt=pct0 contentType=delta />
 </DataTable>
 
-## Ranking do mês
+## Evolução
 
-<Dropdown data={meses} name=mes value=mes label=mes_nome order="mes desc" title="Mês" />
-
-<DataTable data={ranking_mes} rows=25 search=true>
-    <Column id=posicao title="#" />
-    <Column id=modelo title="Modelo" />
-    <Column id=segmento title="Segmento" />
-    <Column id=categoria title="Categoria" />
-    <Column id=emplacamentos title="Emplacamentos" fmt='#,##0' />
-    <Column id=participacao title="Participação no filtro" fmt=pct1 />
-    <Column id=mesmo_mes_ano_anterior title="Mesmo mês do ano anterior" fmt='#,##0' />
-    <Column id=variacao title="Variação" fmt=pct0 contentType=delta />
-</DataTable>
-
-## Mês a mês
-
-Escolha os modelos para comparar (dá para buscar pelo nome). Com a opção "As 5 maiores do período", aparecem os 5 maiores do período e do filtro acima.
-
-<Dropdown data={opcoes_modelo} name=comparar value=modelo title="Comparar modelos" multiple=true defaultValue={['5 maiores']}>
-    <DropdownOption value="5 maiores" valueLabel="As 5 maiores do período" />
+<Dropdown data={opcoes_modelo} name=comparar value=modelo title="Comparar" multiple=true defaultValue={['5 maiores']}>
+    <DropdownOption value="5 maiores" valueLabel="5 maiores" />
 </Dropdown>
 
 <LineChart
@@ -284,27 +249,25 @@ Escolha os modelos para comparar (dá para buscar pelo nome). Com a opção "As 
     y=emplacamentos
     series=modelo
     yFmt='#,##0'
-    title="Emplacamentos por mês"
-    subtitle="Um mês sem ponto = o modelo ficou fora da lista da sua categoria naquele mês"
+    title={periodo[0]?.anual ? 'Emplacamentos (média mensal do ano)' : 'Emplacamentos por mês'}
 />
 
 ## O avanço dos SUVs
 
-Os SUVs eram <Value data={suv} column=em_2010 fmt=pct0 /> dos leves em 2010 e chegaram a **<Value data={suv} column=agora fmt=pct0 />** em <Value data={suv} column=ano_agora />, tomando espaço dos hatches e dos sedãs. As picapes, principalmente as pequenas (Strada, Saveiro, Montana), também cresceram. O gráfico abaixo segue os filtros: escolha uma marca para ver como ela mudou o seu portfólio.
+<BigValue data={suv} value=agora title="SUVs nos leves" fmt=pct0 comparison=desde_2010 comparisonFmt=pct0 comparisonTitle="pontos desde 2010" />
 
 <BarChart
-    data={carroceria_por_ano}
-    x=ano
-    xFmt='0'
-    y=emplacamentos
-    series=carroceria
-    type=stacked100
-    sort=false
-    title="Participação de cada carroceria"
-    subtitle="Pela categoria da Fenabrave, dentro dos filtros escolhidos"
-/>
+        data={carroceria_por_ano}
+        x=ano
+        xFmt='0'
+        y=emplacamentos
+        series=carroceria
+        type=stacked100
+        sort=false
+        title="Participação de cada carroceria, desde 2003"
+    />
 
-<DataTable data={lideres} rows=30 title="Modelo mais emplacado de cada ano (no filtro)">
+<DataTable data={lideres} rows=10 title="Mais emplacado de cada ano">
     <Column id=ano title="Ano" />
     <Column id=modelo title="Modelo" />
     <Column id=emplacamentos title="Emplacamentos" fmt='#,##0' />
@@ -312,8 +275,6 @@ Os SUVs eram <Value data={suv} column=em_2010 fmt=pct0 /> dos leves em 2010 e ch
 
 <Alert status="info">
 
-A Fenabrave lista os modelos mais emplacados de cada categoria, não todos. Por isso, o total de um modelo no ano é um **piso**: se ele ficou fora da lista em algum mês, aquele mês não entra, e modelos de volume muito baixo podem nem aparecer. O ano mais recente ainda está em andamento, e 2003 e 2005 têm um mês sem a tabela de modelos.
-
-**Filtro de canal:** com "Varejo" ou "Venda direta", os números vêm das listas por canal da Fenabrave: os ~50 automóveis e ~40 comerciais leves mais emplacados no mês em cada canal, que cobrem de 88% a 100% do canal. Essas listas não trazem a categoria, que vem das tabelas por categoria; modelos que nunca aparecem nelas ficam como "Não classificado". Out/2003, mar/2005 e set/2023 não têm as listas por canal. A Fenabrave não mede o atacado (venda da montadora para a concessionária), que é dado da Anfavea.
+A Fenabrave lista só os mais emplacados de cada categoria (ou de cada canal), então o total de um modelo é um piso. [Metodologia](/metodologia)
 
 </Alert>
