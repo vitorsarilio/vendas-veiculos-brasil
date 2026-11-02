@@ -36,5 +36,7 @@ else
 fi
 
 git commit -m "${mensagem}"
+# Alguém pode ter enviado commits durante a execução: traz antes de enviar
+git pull --rebase --quiet origin "$(git rev-parse --abbrev-ref HEAD)"
 git push
 echo "Commit feito: ${mensagem}"
