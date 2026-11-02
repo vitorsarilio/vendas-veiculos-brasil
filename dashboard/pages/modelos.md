@@ -4,16 +4,18 @@ sidebar_position: 4
 ---
 
 <!--
-  Filtros: os anos são escolhidos em dois seletores (de/até); os demais aceitam vários
+  Filtros: o período é escolhido em dois seletores de mês (de/até); os demais aceitam vários
   valores e começam com tudo marcado. Todas as consultas abaixo partem de `filtrado`.
 -->
 
-```sql anos_crescente
-select distinct cast(ano as integer) as ano from veiculos.modelos order by ano
+```sql meses_crescente
+select strftime(mes_referencia, '%Y-%m') as mes, strftime(mes_referencia, '%m/%Y') as mes_nome
+from veiculos.mensal where segmento = 'leves' order by mes
 ```
 
-```sql anos_decrescente
-select distinct cast(ano as integer) as ano from veiculos.modelos order by ano desc
+```sql meses_decrescente
+select strftime(mes_referencia, '%Y-%m') as mes, strftime(mes_referencia, '%m/%Y') as mes_nome
+from veiculos.mensal where segmento = 'leves' order by mes desc
 ```
 
 ```sql opcoes_segmento
@@ -56,8 +58,8 @@ group by modelo_completo
 order by total desc
 ```
 
-<Dropdown data={anos_crescente} name=ano_inicio value=ano title="De" />
-<Dropdown data={anos_decrescente} name=ano_fim value=ano title="Até" />
+<Dropdown data={meses_crescente} name=inicio value=mes label=mes_nome order=mes title="De (mês/ano)" />
+<Dropdown data={meses_decrescente} name=fim value=mes label=mes_nome order="mes desc" title="Até (mês/ano)" />
 <Dropdown data={opcoes_segmento} name=segmento value=segmento label=nome title="Segmento" multiple=true selectAllByDefault=true />
 <Dropdown data={opcoes_carroceria} name=carroceria value=carroceria title="Carroceria" multiple=true selectAllByDefault=true />
 <Dropdown data={opcoes_categoria} name=categoria value=categoria title="Categoria" multiple=true selectAllByDefault=true />
@@ -75,9 +77,10 @@ select
     modelo_completo,
     categoria,
     carroceria,
+    mes_referencia,
     emplacamentos
-from veiculos.modelos
-where cast(ano as integer) between ${inputs.ano_inicio.value} and ${inputs.ano_fim.value}
+from veiculos.modelos_mensal
+where strftime(mes_referencia, '%Y-%m') between '${inputs.inicio.value}' and '${inputs.fim.value}'
   and segmento in ${inputs.segmento.value}
   and carroceria in ${inputs.carroceria.value}
   and categoria in ${inputs.categoria.value}
@@ -104,7 +107,7 @@ select
     origem,
     sum(emplacamentos)                              as emplacamentos,
     sum(emplacamentos) / sum(sum(emplacamentos)) over () as participacao,
-    cast(min(ano) as varchar) || case when min(ano) < max(ano) then '–' || cast(max(ano) as varchar) else '' end as anos
+    count(distinct mes_referencia)                  as meses
 from ${filtrado}
 group by modelo_completo, marca, origem
 order by emplacamentos desc
@@ -160,7 +163,7 @@ select
     modelo_completo                     as modelo,
     sum(emplacamentos)                  as emplacamentos
 from veiculos.modelos_mensal
-where cast(ano as integer) between ${inputs.ano_inicio.value} and ${inputs.ano_fim.value}
+where strftime(mes_referencia, '%Y-%m') between '${inputs.inicio.value}' and '${inputs.fim.value}'
   and modelo_completo in (select modelo from lista)
 group by all
 order by mes, modelo
@@ -211,12 +214,12 @@ Todos os modelos listados pela Fenabrave no período e nos filtros escolhidos. U
     <Column id=origem title="Origem" />
     <Column id=emplacamentos title="Emplacamentos" fmt='#,##0' />
     <Column id=participacao title="Participação" fmt=pct1 />
-    <Column id=anos title="Anos listado" />
+    <Column id=meses title="Meses listado" fmt='#,##0' />
 </DataTable>
 
 ## Ranking do mês
 
-<Dropdown data={meses} name=mes value=mes label=mes_nome title="Mês" />
+<Dropdown data={meses} name=mes value=mes label=mes_nome order="mes desc" title="Mês" />
 
 <DataTable data={ranking_mes} rows=25 search=true>
     <Column id=posicao title="#" />

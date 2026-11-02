@@ -9,12 +9,14 @@ sidebar_position: 3
   Os textos de destaque usam a série inteira de leves.
 -->
 
-```sql anos_crescente
-select distinct cast(ano as integer) as ano from veiculos.marcas order by ano
+```sql meses_crescente
+select strftime(mes_referencia, '%Y-%m') as mes, strftime(mes_referencia, '%m/%Y') as mes_nome
+from veiculos.mensal where segmento = 'leves' order by mes
 ```
 
-```sql anos_decrescente
-select distinct cast(ano as integer) as ano from veiculos.marcas order by ano desc
+```sql meses_decrescente
+select strftime(mes_referencia, '%Y-%m') as mes, strftime(mes_referencia, '%m/%Y') as mes_nome
+from veiculos.mensal where segmento = 'leves' order by mes desc
 ```
 
 ```sql opcoes_origem
@@ -39,8 +41,8 @@ group by all
 order by mes desc
 ```
 
-<Dropdown data={anos_crescente} name=ano_inicio value=ano title="De" />
-<Dropdown data={anos_decrescente} name=ano_fim value=ano title="Até" />
+<Dropdown data={meses_crescente} name=inicio value=mes label=mes_nome order=mes title="De (mês/ano)" />
+<Dropdown data={meses_decrescente} name=fim value=mes label=mes_nome order="mes desc" title="Até (mês/ano)" />
 <ButtonGroup name=segmento title="Segmento">
     <ButtonGroupItem valueLabel="Leves" value="leves" default />
     <ButtonGroupItem valueLabel="Automóveis" value="automoveis" />
@@ -50,29 +52,37 @@ order by mes desc
 <Dropdown data={opcoes_marca} name=marca value=marca title="Marca" multiple=true selectAllByDefault=true />
 
 ```sql no_periodo
--- Todas as marcas (e "Outras") no segmento e período; a participação é sobre o total do
--- segmento, então não muda quando se filtra a origem ou a marca
+-- Marcas do ranking em cada mês entre "De" e "Até", no segmento escolhido
 select
+    mes_referencia,
     cast(ano as integer)    as ano,
     marca,
     pais_origem,
     origem,
-    eh_outras,
     emplacamentos
-from veiculos.marcas
+from veiculos.marcas_mensal
 where segmento = '${inputs.segmento}'
-  and cast(ano as integer) between ${inputs.ano_inicio.value} and ${inputs.ano_fim.value}
+  and strftime(mes_referencia, '%Y-%m') between '${inputs.inicio.value}' and '${inputs.fim.value}'
 ```
 
 ```sql filtrado
 select * from ${no_periodo}
-where not eh_outras
-  and origem in ${inputs.origem.value}
+where origem in ${inputs.origem.value}
   and marca in ${inputs.marca.value}
 ```
 
+```sql total_por_ano
+-- Total do segmento (inclui as marcas fora do ranking); a participação é sobre ele,
+-- então não muda quando se filtra a origem ou a marca
+select cast(ano as integer) as ano, sum(emplacamentos) as total
+from veiculos.mensal
+where segmento = '${inputs.segmento}'
+  and strftime(mes_referencia, '%Y-%m') between '${inputs.inicio.value}' and '${inputs.fim.value}'
+group by ano
+```
+
 ```sql total_periodo
-select sum(emplacamentos) as total from ${no_periodo}
+select sum(total) as total from ${total_por_ano}
 ```
 
 ```sql ranking
@@ -83,7 +93,7 @@ select
     f.origem,
     sum(f.emplacamentos)                                    as emplacamentos,
     sum(f.emplacamentos) / max(t.total)                     as participacao,
-    cast(min(f.ano) as varchar) || case when min(f.ano) < max(f.ano) then '–' || cast(max(f.ano) as varchar) else '' end as anos
+    count(distinct f.mes_referencia)                        as meses
 from ${filtrado} as f
 cross join ${total_periodo} as t
 group by f.marca, f.pais_origem, f.origem
@@ -146,14 +156,26 @@ select
     participacao_pct / 100              as participacao
 from veiculos.marcas_mensal
 where segmento = '${inputs.segmento}'
-  and cast(ano as integer) between ${inputs.ano_inicio.value} and ${inputs.ano_fim.value}
+  and strftime(mes_referencia, '%Y-%m') between '${inputs.inicio.value}' and '${inputs.fim.value}'
   and marca in (select marca from lista)
 order by mes, marca
 ```
 
 ```sql origem_por_ano
+-- As marcas fora do ranking entram como "Não classificado"
+with marcas as (
+    select ano, origem, sum(emplacamentos) as emplacamentos
+    from ${no_periodo}
+    group by all
+),
+fora_do_ranking as (
+    select t.ano, 'Não classificado' as origem, t.total - coalesce(sum(m.emplacamentos), 0) as emplacamentos
+    from ${total_por_ano} as t
+    left join marcas as m using (ano)
+    group by t.ano, t.total
+)
 select ano, origem, sum(emplacamentos) as emplacamentos
-from ${no_periodo}
+from (select * from marcas union all select * from fora_do_ranking)
 group by all
 order by ano, origem
 ```
@@ -188,7 +210,7 @@ select
 
 ## Ranking do mês
 
-<Dropdown data={meses} name=mes value=mes label=mes_nome title="Mês" />
+<Dropdown data={meses} name=mes value=mes label=mes_nome order="mes desc" title="Mês" />
 
 <DataTable data={ranking_mes} rows=25 search=true>
     <Column id=posicao title="#" />
@@ -236,7 +258,7 @@ Todas as marcas que apareceram no ranking da Fenabrave no período e no segmento
     <Column id=pais_origem title="País de origem" />
     <Column id=emplacamentos title="Emplacamentos" fmt='#,##0' />
     <Column id=participacao title="Participação" fmt=pct1 />
-    <Column id=anos title="Anos no ranking" />
+    <Column id=meses title="Meses no ranking" fmt='#,##0' />
 </DataTable>
 
 ## A queda das quatro grandes

@@ -3,43 +3,51 @@ title: Mercado
 sidebar_position: 1
 ---
 
-```sql anos_crescente
-select distinct cast(ano as integer) as ano from veiculos.anual order by ano
+```sql meses_crescente
+select strftime(mes_referencia, '%Y-%m') as mes, strftime(mes_referencia, '%m/%Y') as mes_nome
+from veiculos.mensal where segmento = 'leves' order by mes
 ```
 
-```sql anos_decrescente
-select distinct cast(ano as integer) as ano from veiculos.anual order by ano desc
+```sql meses_decrescente
+select strftime(mes_referencia, '%Y-%m') as mes, strftime(mes_referencia, '%m/%Y') as mes_nome
+from veiculos.mensal where segmento = 'leves' order by mes desc
 ```
 
-<Dropdown data={anos_crescente} name=ano_inicio value=ano title="De" />
-<Dropdown data={anos_decrescente} name=ano_fim value=ano title="Até" />
+<Dropdown data={meses_crescente} name=inicio value=mes label=mes_nome order=mes title="De (mês/ano)" />
+<Dropdown data={meses_decrescente} name=fim value=mes label=mes_nome order="mes desc" title="Até (mês/ano)" />
 <ButtonGroup name=segmento title="Segmento">
     <ButtonGroupItem valueLabel="Leves" value="leves" default />
     <ButtonGroupItem valueLabel="Automóveis" value="automoveis" />
     <ButtonGroupItem valueLabel="Comerciais leves" value="comerciais_leves" />
 </ButtonGroup>
 
+```sql no_periodo
+-- Meses entre "De" e "Até" (inclusive), em todos os segmentos
+select * from veiculos.mensal
+where strftime(mes_referencia, '%Y-%m') between '${inputs.inicio.value}' and '${inputs.fim.value}'
+```
+
 ```sql anual_filtrado
+-- Cada ano soma só os meses do período; a variação compara com os mesmos meses do ano anterior
 select
     cast(ano as integer)                    as ano,
-    emplacamentos,
-    variacao_ano_anterior_pct / 100         as variacao
-from veiculos.anual
+    sum(emplacamentos)                      as emplacamentos,
+    sum(emplacamentos) / sum(emplacamentos_mesmo_mes_ano_anterior) - 1 as variacao
+from ${no_periodo}
 where segmento = '${inputs.segmento}'
-  and cast(ano as integer) between ${inputs.ano_inicio.value} and ${inputs.ano_fim.value}
+group by ano
+having count(emplacamentos_mesmo_mes_ano_anterior) = count(*)
 order by ano
 ```
 
 ```sql mensal_filtrado
 select mes_referencia + interval 12 hour as mes, 'Emplacamentos no mês' as serie, emplacamentos as valor
-from veiculos.mensal
+from ${no_periodo}
 where segmento = '${inputs.segmento}'
-  and cast(ano as integer) between ${inputs.ano_inicio.value} and ${inputs.ano_fim.value}
 union all
 select mes_referencia + interval 12 hour, 'Média móvel de 12 meses', media_movel_12m
-from veiculos.mensal
+from ${no_periodo}
 where segmento = '${inputs.segmento}' and media_movel_12m is not null
-  and cast(ano as integer) between ${inputs.ano_inicio.value} and ${inputs.ano_fim.value}
 order by mes, serie
 ```
 
@@ -75,10 +83,10 @@ order by ano
 select
     cast(ano as integer)        as ano,
     case segmento when 'automoveis' then 'Automóveis' else 'Comerciais leves' end as segmento,
-    emplacamentos
-from veiculos.anual
+    sum(emplacamentos)          as emplacamentos
+from ${no_periodo}
 where segmento <> 'leves'
-  and cast(ano as integer) between ${inputs.ano_inicio.value} and ${inputs.ano_fim.value}
+group by all
 order by ano, segmento
 ```
 
@@ -117,7 +125,7 @@ O mercado de leves mais que dobrou entre 2003 e o pico de **<Value data={pico_e_
     sort=false
     yFmt=pct0
     title="Variação sobre o ano anterior"
-    subtitle="No ano em andamento, a comparação é com os mesmos meses do ano anterior"
+    subtitle="Com os meses do período escolhido, comparados com os mesmos meses do ano anterior"
     colorPalette={['#2f855a', '#c53030']}
 />
 
@@ -142,7 +150,7 @@ O mercado de leves mais que dobrou entre 2003 e o pico de **<Value data={pico_e_
     sort=false
     yFmt='#,##0'
     title="Emplacamentos por segmento"
-    subtitle="Comerciais leves = picapes e furgões (no período escolhido)"
+    subtitle="Comerciais leves = picapes e furgões. Cada ano soma só os meses do período escolhido"
 />
 
 <BarChart

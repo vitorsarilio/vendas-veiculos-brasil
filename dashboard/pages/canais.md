@@ -3,16 +3,18 @@ title: Canais
 sidebar_position: 2
 ---
 
-```sql anos_crescente
-select distinct cast(ano as integer) as ano from veiculos.anual order by ano
+```sql meses_crescente
+select strftime(mes_referencia, '%Y-%m') as mes, strftime(mes_referencia, '%m/%Y') as mes_nome
+from veiculos.mensal where segmento = 'leves' order by mes
 ```
 
-```sql anos_decrescente
-select distinct cast(ano as integer) as ano from veiculos.anual order by ano desc
+```sql meses_decrescente
+select strftime(mes_referencia, '%Y-%m') as mes, strftime(mes_referencia, '%m/%Y') as mes_nome
+from veiculos.mensal where segmento = 'leves' order by mes desc
 ```
 
-<Dropdown data={anos_crescente} name=ano_inicio value=ano title="De" />
-<Dropdown data={anos_decrescente} name=ano_fim value=ano title="Até" />
+<Dropdown data={meses_crescente} name=inicio value=mes label=mes_nome order=mes title="De (mês/ano)" />
+<Dropdown data={meses_decrescente} name=fim value=mes label=mes_nome order="mes desc" title="Até (mês/ano)" />
 <ButtonGroup name=segmento title="Segmento (gráficos de unidades e mês a mês)">
     <ButtonGroupItem valueLabel="Leves" value="leves" default />
     <ButtonGroupItem valueLabel="Automóveis" value="automoveis" />
@@ -20,8 +22,16 @@ select distinct cast(ano as integer) as ano from veiculos.anual order by ano des
 </ButtonGroup>
 
 ```sql no_periodo
-select * from ${anual}
-where ano between ${inputs.ano_inicio.value} and ${inputs.ano_fim.value}
+-- Cada ano soma só os meses entre "De" e "Até"; meses sem o dado de canal ficam de fora
+select
+    cast(ano as integer)                                as ano,
+    segmento,
+    sum(emplacamentos_venda_direta) / sum(emplacamentos) filter (where venda_direta_pct is not null) as venda_direta,
+    sum(emplacamentos_venda_direta)                     as emplacamentos_venda_direta,
+    sum(emplacamentos_varejo)                           as emplacamentos_varejo
+from veiculos.mensal
+where strftime(mes_referencia, '%Y-%m') between '${inputs.inicio.value}' and '${inputs.fim.value}'
+group by all
 ```
 
 ```sql anual
@@ -65,7 +75,7 @@ select
     venda_direta_pct / 100              as venda_direta
 from veiculos.mensal
 where segmento = '${inputs.segmento}' and venda_direta_pct is not null
-  and cast(ano as integer) between ${inputs.ano_inicio.value} and ${inputs.ano_fim.value}
+  and strftime(mes_referencia, '%Y-%m') between '${inputs.inicio.value}' and '${inputs.fim.value}'
 order by mes_referencia
 ```
 
