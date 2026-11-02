@@ -4,7 +4,9 @@ sidebar_position: 3
 ---
 
 <!--
-  Os textos de destaque usam a série inteira de leves; tabelas e gráficos seguem os filtros.
+  Filtros gerais (período, segmento, origem e marca) valem para o comparativo mês a mês e
+  para o ranking do período. O ranking do mês tem o seu próprio seletor de mês.
+  Os textos de destaque usam a série inteira de leves.
 -->
 
 ```sql anos_crescente
@@ -28,6 +30,15 @@ group by marca
 order by total desc nulls last, marca
 ```
 
+```sql meses
+select
+    strftime(mes_referencia, '%Y-%m')   as mes,
+    strftime(mes_referencia, '%m/%Y')   as mes_nome
+from veiculos.marcas_mensal
+group by all
+order by mes desc
+```
+
 <Dropdown data={anos_crescente} name=ano_inicio value=ano title="De" />
 <Dropdown data={anos_decrescente} name=ano_fim value=ano title="Até" />
 <ButtonGroup name=segmento title="Segmento">
@@ -39,16 +50,15 @@ order by total desc nulls last, marca
 <Dropdown data={opcoes_marca} name=marca value=marca title="Marca" multiple=true selectAllByDefault=true />
 
 ```sql no_periodo
--- Todas as marcas (e "Outras") no segmento e período escolhidos; a participação é sobre o
--- total do segmento, então não muda quando se filtra a origem ou a marca
+-- Todas as marcas (e "Outras") no segmento e período; a participação é sobre o total do
+-- segmento, então não muda quando se filtra a origem ou a marca
 select
     cast(ano as integer)    as ano,
     marca,
     pais_origem,
     origem,
     eh_outras,
-    emplacamentos,
-    emplacamentos / sum(emplacamentos) over (partition by ano) as participacao
+    emplacamentos
 from veiculos.marcas
 where segmento = '${inputs.segmento}'
   and cast(ano as integer) between ${inputs.ano_inicio.value} and ${inputs.ano_fim.value}
@@ -73,7 +83,6 @@ select
     f.origem,
     sum(f.emplacamentos)                                    as emplacamentos,
     sum(f.emplacamentos) / max(t.total)                     as participacao,
-    count(distinct f.ano)                                   as anos_no_ranking,
     cast(min(f.ano) as varchar) || case when min(f.ano) < max(f.ano) then '–' || cast(max(f.ano) as varchar) else '' end as anos
 from ${filtrado} as f
 cross join ${total_periodo} as t
@@ -89,13 +98,57 @@ select
 from ${ranking}
 ```
 
-```sql evolucao
--- As 8 marcas com mais emplacamentos no filtro, ano a ano
-with top as (select marca from ${ranking} order by posicao limit 8)
-select f.ano, f.marca, f.participacao
-from ${filtrado} as f
-join top as t using (marca)
-order by f.ano, f.participacao desc
+```sql ranking_mes
+-- Todas as marcas do ranking no mês escolhido, com o mesmo mês do ano anterior
+with mes as (
+    select *
+    from veiculos.marcas_mensal
+    where segmento = '${inputs.segmento}'
+      and strftime(mes_referencia, '%Y-%m') = '${inputs.mes.value}'
+      and origem in ${inputs.origem.value}
+      and marca in ${inputs.marca.value}
+),
+ano_anterior as (
+    select marca, emplacamentos
+    from veiculos.marcas_mensal
+    where segmento = '${inputs.segmento}'
+      and strftime(mes_referencia + interval 1 year, '%Y-%m') = '${inputs.mes.value}'
+)
+select
+    cast(m.posicao as integer)                  as posicao,
+    m.marca,
+    m.pais_origem,
+    m.emplacamentos,
+    m.participacao_pct / 100                    as participacao,
+    a.emplacamentos                             as mesmo_mes_ano_anterior,
+    m.emplacamentos / a.emplacamentos - 1       as variacao
+from mes as m
+left join ano_anterior as a using (marca)
+order by m.posicao
+```
+
+```sql escolhidas
+select distinct marca from veiculos.marcas_mensal where marca in ${inputs.comparar.value}
+```
+
+```sql comparativo
+-- Marcas escolhidas em "Comparar marcas"; sem escolha, as 5 maiores do período no filtro
+with maiores as (select marca from ${ranking} order by posicao limit 5),
+lista as (
+    select marca from ${escolhidas}
+    union all
+    select marca from maiores where (select count(*) from ${escolhidas}) = 0
+)
+select
+    mes_referencia + interval 12 hour   as mes,
+    marca,
+    emplacamentos,
+    participacao_pct / 100              as participacao
+from veiculos.marcas_mensal
+where segmento = '${inputs.segmento}'
+  and cast(ano as integer) between ${inputs.ano_inicio.value} and ${inputs.ano_fim.value}
+  and marca in (select marca from lista)
+order by mes, marca
 ```
 
 ```sql origem_por_ano
@@ -129,9 +182,49 @@ select
     (select participacao from ${china} where ano = 2020) as china_2020
 ```
 
-<BigValue data={resumo_filtro} value=emplacamentos title="Emplacamentos das marcas escolhidas" fmt='#,##0' />
+<BigValue data={resumo_filtro} value=emplacamentos title="Emplacamentos das marcas no período" fmt='#,##0' />
 <BigValue data={resumo_filtro} value=participacao title="Participação no segmento" fmt=pct1 />
 <BigValue data={resumo_filtro} value=marcas title="Marcas" fmt='#,##0' />
+
+## Ranking do mês
+
+<Dropdown data={meses} name=mes value=mes label=mes_nome title="Mês" />
+
+<DataTable data={ranking_mes} rows=25 search=true>
+    <Column id=posicao title="#" />
+    <Column id=marca title="Marca" />
+    <Column id=pais_origem title="País de origem" />
+    <Column id=emplacamentos title="Emplacamentos" fmt='#,##0' />
+    <Column id=participacao title="Participação" fmt=pct1 />
+    <Column id=mesmo_mes_ano_anterior title="Mesmo mês do ano anterior" fmt='#,##0' />
+    <Column id=variacao title="Variação" fmt=pct0 contentType=delta />
+</DataTable>
+
+## Mês a mês
+
+Escolha as marcas para comparar. Com a opção "As 5 maiores do período", aparecem as 5 maiores do período e do filtro acima.
+
+<Dropdown data={opcoes_marca} name=comparar value=marca title="Comparar marcas" multiple=true defaultValue={['5 maiores']}>
+    <DropdownOption value="5 maiores" valueLabel="As 5 maiores do período" />
+</Dropdown>
+
+<LineChart
+    data={comparativo}
+    x=mes
+    y=emplacamentos
+    series=marca
+    yFmt='#,##0'
+    title="Emplacamentos por mês"
+/>
+
+<LineChart
+    data={comparativo}
+    x=mes
+    y=participacao
+    series=marca
+    yFmt=pct0
+    title="Participação no segmento, por mês"
+/>
 
 ## Ranking no período
 
@@ -145,17 +238,6 @@ Todas as marcas que apareceram no ranking da Fenabrave no período e no segmento
     <Column id=participacao title="Participação" fmt=pct1 />
     <Column id=anos title="Anos no ranking" />
 </DataTable>
-
-<LineChart
-    data={evolucao}
-    x=ano
-    xFmt='0'
-    y=participacao
-    series=marca
-    yFmt=pct0
-    title="Participação das 8 maiores marcas do filtro, ano a ano"
-    subtitle="Para comparar marcas específicas, escolha-as no filtro de marca"
-/>
 
 ## A queda das quatro grandes
 

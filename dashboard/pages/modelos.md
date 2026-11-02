@@ -40,6 +40,22 @@ select marca, sum(emplacamentos) as total from veiculos.modelos group by marca o
 select distinct origem from veiculos.modelos order by origem
 ```
 
+```sql meses
+select
+    strftime(mes_referencia, '%Y-%m')   as mes,
+    strftime(mes_referencia, '%m/%Y')   as mes_nome
+from veiculos.modelos_mensal
+group by all
+order by mes desc
+```
+
+```sql opcoes_modelo
+select modelo_completo as modelo, sum(emplacamentos) as total
+from veiculos.modelos
+group by modelo_completo
+order by total desc
+```
+
 <Dropdown data={anos_crescente} name=ano_inicio value=ano title="De" />
 <Dropdown data={anos_decrescente} name=ano_fim value=ano title="Até" />
 <Dropdown data={opcoes_segmento} name=segmento value=segmento label=nome title="Segmento" multiple=true selectAllByDefault=true />
@@ -94,14 +110,60 @@ group by modelo_completo, marca, origem
 order by emplacamentos desc
 ```
 
-```sql evolucao
--- Os 8 modelos com mais emplacamentos no filtro, ano a ano
-with top as (select modelo from ${ranking} order by posicao limit 8)
-select f.ano, f.modelo_completo as modelo, sum(f.emplacamentos) as emplacamentos
-from ${filtrado} as f
-join top as t on t.modelo = f.modelo_completo
+```sql ranking_mes
+-- Todos os modelos listados no mês escolhido (com os filtros), e o mesmo mês do ano anterior
+with mes as (
+    select *
+    from veiculos.modelos_mensal
+    where strftime(mes_referencia, '%Y-%m') = '${inputs.mes.value}'
+      and segmento in ${inputs.segmento.value}
+      and carroceria in ${inputs.carroceria.value}
+      and categoria in ${inputs.categoria.value}
+      and marca in ${inputs.marca.value}
+      and origem in ${inputs.origem.value}
+),
+ano_anterior as (
+    select modelo_completo, sum(emplacamentos) as emplacamentos
+    from veiculos.modelos_mensal
+    where strftime(mes_referencia + interval 1 year, '%Y-%m') = '${inputs.mes.value}'
+    group by modelo_completo
+)
+select
+    row_number() over (order by m.emplacamentos desc, m.modelo_completo) as posicao,
+    m.modelo_completo                           as modelo,
+    case m.segmento when 'automoveis' then 'Automóvel' else 'Comercial leve' end as segmento,
+    m.categoria,
+    m.carroceria,
+    m.emplacamentos,
+    m.emplacamentos / sum(m.emplacamentos) over () as participacao,
+    a.emplacamentos                             as mesmo_mes_ano_anterior,
+    m.emplacamentos / a.emplacamentos - 1       as variacao
+from mes as m
+left join ano_anterior as a using (modelo_completo)
+order by posicao
+```
+
+```sql escolhidos
+select distinct modelo_completo as modelo from veiculos.modelos where modelo_completo in ${inputs.comparar.value}
+```
+
+```sql comparativo
+-- Modelos escolhidos em "Comparar modelos"; sem escolha, os 5 maiores do período no filtro
+with maiores as (select modelo from ${ranking} order by posicao limit 5),
+lista as (
+    select modelo from ${escolhidos}
+    union all
+    select modelo from maiores where (select count(*) from ${escolhidos}) = 0
+)
+select
+    mes_referencia + interval 12 hour   as mes,
+    modelo_completo                     as modelo,
+    sum(emplacamentos)                  as emplacamentos
+from veiculos.modelos_mensal
+where cast(ano as integer) between ${inputs.ano_inicio.value} and ${inputs.ano_fim.value}
+  and modelo_completo in (select modelo from lista)
 group by all
-order by f.ano, emplacamentos desc
+order by mes, modelo
 ```
 
 ```sql carroceria_por_ano
@@ -136,7 +198,7 @@ select
 <BigValue data={resumo_filtro} value=modelos title="Modelos" fmt='#,##0' />
 <BigValue data={resumo_filtro} value=marcas title="Marcas" fmt='#,##0' />
 
-## Todos os modelos
+## Todos os modelos do período
 
 Todos os modelos listados pela Fenabrave no período e nos filtros escolhidos. Use a busca da tabela para achar um modelo pelo nome.
 
@@ -152,15 +214,37 @@ Todos os modelos listados pela Fenabrave no período e nos filtros escolhidos. U
     <Column id=anos title="Anos listado" />
 </DataTable>
 
+## Ranking do mês
+
+<Dropdown data={meses} name=mes value=mes label=mes_nome title="Mês" />
+
+<DataTable data={ranking_mes} rows=25 search=true>
+    <Column id=posicao title="#" />
+    <Column id=modelo title="Modelo" />
+    <Column id=segmento title="Segmento" />
+    <Column id=categoria title="Categoria" />
+    <Column id=emplacamentos title="Emplacamentos" fmt='#,##0' />
+    <Column id=participacao title="Participação no filtro" fmt=pct1 />
+    <Column id=mesmo_mes_ano_anterior title="Mesmo mês do ano anterior" fmt='#,##0' />
+    <Column id=variacao title="Variação" fmt=pct0 contentType=delta />
+</DataTable>
+
+## Mês a mês
+
+Escolha os modelos para comparar (dá para buscar pelo nome). Com a opção "As 5 maiores do período", aparecem os 5 maiores do período e do filtro acima.
+
+<Dropdown data={opcoes_modelo} name=comparar value=modelo title="Comparar modelos" multiple=true defaultValue={['5 maiores']}>
+    <DropdownOption value="5 maiores" valueLabel="As 5 maiores do período" />
+</Dropdown>
+
 <LineChart
-    data={evolucao}
-    x=ano
-    xFmt='0'
+    data={comparativo}
+    x=mes
     y=emplacamentos
     series=modelo
     yFmt='#,##0'
-    title="Evolução dos 8 modelos mais emplacados no filtro"
-    subtitle="Para comparar modelos específicos, escolha as marcas, a categoria ou a carroceria acima"
+    title="Emplacamentos por mês"
+    subtitle="Um mês sem ponto = o modelo ficou fora da lista da sua categoria naquele mês"
 />
 
 ## O avanço dos SUVs

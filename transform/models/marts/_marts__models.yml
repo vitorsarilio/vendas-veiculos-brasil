@@ -76,3 +76,21 @@ models:
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments: { combination_of_columns: [ano, segmento, carroceria] }
+
+  - name: fct_emplacamentos_marcas_mensal
+    description: Pergunta 3, mês a mês. Emplacamentos, participação no segmento e posição de cada marca do ranking.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments: { combination_of_columns: [mes_referencia, segmento, marca] }
+    columns:
+      - name: emplacamentos
+        data_tests: [not_null]
+
+  - name: fct_emplacamentos_modelos_mensal
+    description: Pergunta 4, mês a mês. Emplacamentos de cada modelo listado, com categoria, carroceria e origem.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments: { combination_of_columns: [mes_referencia, segmento, modelo_completo] }
+    columns:
+      - name: emplacamentos
+        data_tests: [not_null]
