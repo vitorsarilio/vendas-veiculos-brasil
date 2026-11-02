@@ -1,0 +1,47 @@
+# Evidence (framework estático "legacy", versão fixada em package.json).
+
+# O site é publicado em https://vitorsarilio.github.io/vendas-veiculos-brasil/
+deployment:
+  basePath: /vendas-veiculos-brasil
+
+appearance:
+  default: light
+  switcher: true
+
+theme:
+  colorPalettes:
+    default:
+      light: ["#1d4e89", "#d1495b", "#00798c", "#edae49", "#66a182", "#8d6a9f", "#30343f", "#b56576"]
+      dark:  ["#5b8fd1", "#e8707f", "#2eb3c6", "#f3c46e", "#8cc2a6", "#b392c4", "#9aa0b0", "#d48c99"]
+  colorScales:
+    default:
+      light: ["#dbe6f3", "#1d4e89"]
+      dark:  ["#16273d", "#5b8fd1"]
+  colors:
+    primary:
+      light: "#1d4e89"
+      dark: "#5b8fd1"
+    accent:
+      light: "#d1495b"
+      dark: "#e8707f"
+    base:
+      light: "#ffffff"
+      dark: "#0d1117"
+    info:
+      light: "#1d4e89"
+      dark: "#5b8fd1"
+    positive:
+      light: "#2f855a"
+      dark: "#68d391"
+    warning:
+      light: "#b7791f"
+      dark: "#f6ad55"
+    negative:
+      light: "#c53030"
+      dark: "#fc8181"
+
+plugins:
+  components:
+    "@evidence-dev/core-components": {}
+  datasources:
+    "@evidence-dev/duckdb": {}

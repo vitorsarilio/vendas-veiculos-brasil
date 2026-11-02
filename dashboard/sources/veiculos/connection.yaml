@@ -1,0 +1,6 @@
+# DuckDB em memória: as consultas leem direto os Parquet versionados em data/marts.
+# Caminhos relativos à pasta dashboard/ (de onde o `npm run sources` roda).
+name: veiculos
+type: duckdb
+options:
+  filename: ":memory:"
