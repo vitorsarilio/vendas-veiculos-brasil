@@ -146,3 +146,39 @@ def test_cabecalho_com_letras_dobradas_nao_vira_categoria():
         "DDeezz JJaann AAccuummuullaaddoo", "1º VW/POLO 10.196 17.999 111.242 23,40%",
     ])
     assert tabelas.modelos_por_categoria([pagina])[0]["categoria"] == "Hatch Pequenos"
+
+
+def _pagina_modelos_canal(numero, titulo, esquerda, direita):
+    return PaginaFalsa(numero, CABECALHO + [titulo], esquerda=esquerda, direita=direita)
+
+
+MODELOS_DIRETA = _pagina_modelos_canal(
+    30, "Modelos mais emplacados venda direta Setembro/2026",
+    ["AUTOMÓVEIS", "1º VW/POLO 7.798", "2º FIAT/MOBI 6.321", "50º GM/TRAILBLAZER 222"],
+    ["COMERCIAIS LEVES", "1º FIAT/STRADA 9.990", "2º VW TRUCK E BUS/EXPRESS 276"],
+)
+MODELOS_VAREJO = _pagina_modelos_canal(
+    31, "Modelos mais emplacados venda varejo Setembro/2026",
+    ["1º VW/POLO 9.000"], ["1º FIAT/STRADA 5.000"],
+)
+MODELOS_DIRETA_ACUMULADO = _pagina_modelos_canal(
+    32, "Modelos mais emplac. venda direta acumulado até Set/2026", ["1º VW/POLO 70.000"], ["1º FIAT/STRADA 90.000"],
+)
+
+
+def test_modelos_por_canal_le_os_dois_canais_e_os_dois_segmentos():
+    linhas = tabelas.modelos_por_canal([MODELOS_DIRETA, MODELOS_VAREJO, MODELOS_DIRETA_ACUMULADO])
+    assert linhas[0] == {"canal": "venda_direta", "segmento": "automoveis", "posicao": "1", "modelo": "VW/POLO", "quantidade": "7.798"}
+    assert ("venda_direta", "comerciais_leves", "VW TRUCK E BUS/EXPRESS", "276") in [
+        (l["canal"], l["segmento"], l["modelo"], l["quantidade"]) for l in linhas
+    ]
+    assert {(l["canal"], l["modelo"], l["quantidade"]) for l in linhas if l["canal"] == "varejo"} == {
+        ("varejo", "VW/POLO", "9.000"), ("varejo", "FIAT/STRADA", "5.000"),
+    }
+    # o acumulado (70.000) não entra
+    assert "70.000" not in [l["quantidade"] for l in linhas]
+
+
+def test_modelos_por_canal_sem_varejo_falha():
+    with pytest.raises(tabelas.TabelaNaoEncontrada):
+        tabelas.modelos_por_canal([MODELOS_DIRETA])

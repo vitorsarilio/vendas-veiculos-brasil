@@ -111,3 +111,26 @@ def test_conferir_junta_todos_os_problemas():
         qualidade.conferir([relatorio("2003-01", erros=["fenabrave_marcas: falhou"]), relatorio("2003-03")])
     assert any("lacuna" in p for p in erro.value.problemas)
     assert any("fenabrave_marcas: falhou" in p for p in erro.value.problemas)
+
+
+def _modelos_canal(direta_autos="70.000", posicoes=(1, 2)):
+    return [
+        {"canal": "venda_direta", "segmento": "automoveis", "posicao": str(posicoes[0]), "quantidade": direta_autos},
+        {"canal": "venda_direta", "segmento": "automoveis", "posicao": str(posicoes[1]), "quantidade": "1.000"},
+        {"canal": "varejo", "segmento": "comerciais_leves", "posicao": "1", "quantidade": "15.000"},
+    ]
+
+
+def test_modelos_por_canal_dentro_do_canal_passa():
+    assert qualidade.conferir_relatorio(relatorio(fenabrave_modelos_canal=_modelos_canal())) == []
+
+
+def test_modelos_por_canal_acima_das_unidades_do_canal():
+    # venda direta de automóveis = 40% de 186.000 = 74.400 (+1% de folga = 76.260)
+    problemas = qualidade.conferir_relatorio(relatorio(fenabrave_modelos_canal=_modelos_canal(direta_autos="80.000")))
+    assert any("mais que o canal" in p for p in problemas)
+
+
+def test_modelos_por_canal_com_posicao_pulada():
+    problemas = qualidade.conferir_relatorio(relatorio(fenabrave_modelos_canal=_modelos_canal(posicoes=(1, 3))))
+    assert any("posições fora de ordem" in p for p in problemas)

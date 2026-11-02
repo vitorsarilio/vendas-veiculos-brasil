@@ -22,3 +22,5 @@ sources:
         description: Modelos por categoria (hatch, sedã, SUV, picape…), com mês anterior, mês e acumulado do ano.
       - name: fenabrave_canal
         description: Participação de varejo e de venda direta no mês, em %, por segmento.
+      - name: fenabrave_modelos_canal
+        description: Os ~50 automóveis e ~40 comerciais leves mais emplacados no mês em cada canal (varejo e venda direta).

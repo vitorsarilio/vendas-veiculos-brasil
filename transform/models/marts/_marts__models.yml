@@ -94,3 +94,18 @@ models:
     columns:
       - name: emplacamentos
         data_tests: [not_null]
+
+  - name: fct_emplacamentos_modelos_canal_mensal
+    description: >
+      Varejo × venda direta por modelo, mês a mês: os ~50 automóveis e ~40 comerciais leves
+      mais emplacados em cada canal. Somar por marca dá um piso do canal da marca.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments: { combination_of_columns: [mes_referencia, canal, segmento, modelo_completo] }
+    columns:
+      - name: canal
+        data_tests:
+          - accepted_values:
+              arguments: { values: [varejo, venda_direta] }
+      - name: emplacamentos
+        data_tests: [not_null]

@@ -306,3 +306,46 @@ def canal_em_texto(paginas: list[Pagina]) -> list[dict] | None:
             linhas.append({"segmento": segmento, "venda_direta_pct": por_canal["venda_direta"], "varejo_pct": por_canal["varejo"]})
         return linhas
     raise TabelaNaoEncontrada("página 'Participação de venda direta e venda varejo' do mês")
+
+
+# ---------- modelos por canal (páginas "Modelos mais emplacados venda direta / varejo <mês>") ----------
+
+CANAIS_MODELOS = {"venda direta": "venda_direta", "venda varejo": "varejo"}
+_LINHA_MODELO_CANAL = re.compile(rf"^{_RANK}\s+(.+?)\s+(\d{{1,3}}(?:\.\d{{3}})*|\d+)$")
+
+
+def _linhas_de_modelo_canal(linhas: list[str]) -> list[dict]:
+    resultado = []
+    for linha in linhas:
+        achado = _LINHA_MODELO_CANAL.match(linha)
+        if achado:
+            resultado.append({"posicao": achado.group(1), "modelo": achado.group(2).strip(), "quantidade": achado.group(3)})
+    return resultado
+
+
+def modelos_por_canal(paginas: list[Pagina]) -> list[dict]:
+    """Os ~50 automóveis e ~40 comerciais leves mais emplacados no mês em cada canal.
+
+    A página tem automóveis à esquerda e comerciais leves à direita, uma linha por modelo
+    ("1º VW/GOL 5.407"), só com o mês atual. As páginas "acumulado até" ficam de fora.
+    """
+    resultado = []
+    achados = set()
+    for pagina in _caderno_de_leves(paginas):
+        titulo = _titulo(pagina)
+        if not titulo.startswith("modelos mais emplacados venda"):
+            continue
+        canal = next((c for rotulo, c in CANAIS_MODELOS.items() if titulo.startswith("modelos mais emplacados " + rotulo)), None)
+        if canal is None or canal in achados:
+            continue
+        meio = pagina.pagina.width / 2
+        autos = _linhas_de_modelo_canal(pagina.texto_da_regiao(0, meio))
+        comerciais = _linhas_de_modelo_canal(pagina.texto_da_regiao(meio, pagina.pagina.width))
+        if not autos or not comerciais:
+            raise TabelaNaoEncontrada(f"modelos de automóveis e de comerciais leves em {canal} (página {pagina.numero})")
+        for segmento, linhas in (("automoveis", autos), ("comerciais_leves", comerciais)):
+            resultado += [{"canal": canal, "segmento": segmento, **linha} for linha in linhas]
+        achados.add(canal)
+    if achados != set(CANAIS_MODELOS.values()):
+        raise TabelaNaoEncontrada(f"modelos por canal (achados: {sorted(achados)})")
+    return resultado

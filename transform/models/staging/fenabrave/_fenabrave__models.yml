@@ -111,3 +111,33 @@ models:
           - accepted_values:
               arguments:
                 values: [texto_pdf, imagem_ocr, imagem_ocr_complemento, imagem_texto_sobreposto, imagem_leitura_manual]
+
+  - name: stg_fenabrave__modelos_canal
+    description: Modelos mais emplacados no mês em cada canal (varejo e venda direta).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [mes_referencia, canal, segmento, posicao]
+    columns:
+      - name: canal
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [varejo, venda_direta]
+      - name: marca_fonte
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('marcas')
+                field: marca_fonte
+              config:
+                severity: warn
+      - name: modelo
+        data_tests: [not_null]
+      - name: emplacamentos
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0

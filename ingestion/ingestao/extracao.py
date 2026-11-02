@@ -24,6 +24,7 @@ COLUNAS = {
         "mes_anterior", "mes_atual", "acumulado_ano", "participacao", "origem", "arquivo",
     ],
     "fenabrave_canal": ["mes", "segmento", "venda_direta_pct", "varejo_pct", "origem", "arquivo"],
+    "fenabrave_modelos_canal": ["mes", "canal", "segmento", "posicao", "modelo", "quantidade", "origem", "arquivo"],
 }
 
 
@@ -48,6 +49,7 @@ def extrair_pdf(caminho: Path, mes: str) -> dict:
             etapas["fenabrave_canal"] = tabelas.canal_em_texto
             etapas["fenabrave_modelos"] = tabelas.modelos_por_categoria
             etapas["totais_modelos"] = tabelas.totais_por_categoria
+            etapas["fenabrave_modelos_canal"] = tabelas.modelos_por_canal
         for nome, leitor in etapas.items():
             try:
                 resultado[nome] = leitor(paginas)

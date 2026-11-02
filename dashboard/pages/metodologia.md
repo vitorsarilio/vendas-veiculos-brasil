@@ -44,6 +44,7 @@ Toda semana um robô (GitHub Actions) baixa os relatórios novos, lê as tabelas
 - **Marcas**: a Fenabrave lista só as ~20 maiores de cada mês; o resto aparece como "Outras".
 - **Modelos**: cada categoria lista os mais emplacados, então o total anual de um modelo é um piso.
 - **Canais em unidades** são estimativas: percentual publicado × total do mês.
+- **Marcas e modelos por canal** vêm das listas de cada canal (os ~50 automóveis e ~40 comerciais leves mais emplacados no mês, em unidades). A marca é a soma dos seus modelos dessas listas: um piso, que cobre de 88% a 100% do canal. Out/2003, mar/2005 e set/2023 não têm as listas.
 - **Sem dados por estado**: o relatório só traz as cinco regiões, em percentual.
 
 Código, testes e documentação: [github.com/vitorsarilio/vendas-veiculos-brasil](https://github.com/vitorsarilio/vendas-veiculos-brasil).

@@ -23,7 +23,7 @@ O caderno de automóveis e comerciais leves sempre vem nas primeiras páginas:
 | Ranking de modelos do mês (top N por segmento) | tabela em texto | 2003 | **go** |
 | Modelos por subsegmento (entrada, hatch, sedã, SUV, picapes…): mês anterior, mês, acumulado do ano e participação, cerca de 150 a 180 modelos | tabela em texto | 2003 | **go**, permite responder sobre SUVs |
 | Varejo × venda direta, em % (autos, comerciais leves, A+B, mês e acumulado) | **imagem** com % de 2 casas até jun/2024; **vetorial com texto** (1 casa) a partir de jul/2024 | 2003 | **go**, com extração única das imagens antigas |
-| Modelos mais emplacados em venda direta e em varejo (top N, unidades) | tabela em texto | 2005 (a confirmar para 2003) | go opcional |
+| Modelos mais emplacados em venda direta e em varejo (top 50 automóveis e top ~40 comerciais leves, unidades) | tabela em texto | 2003 (todos os meses, menos out/2003, mar/2005 e set/2023) | **go**: `tabelas.modelos_por_canal`, alimenta o filtro de canal de marcas e modelos |
 | Ranking por marca em varejo e em venda direta | gráfico de barras | – | no-go |
 | Regiões (5 regiões, %) | gráfico com rótulos em texto | 2003 | opcional |
 | UF | não existe | – | **no-go** |

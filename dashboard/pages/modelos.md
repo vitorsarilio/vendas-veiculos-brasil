@@ -5,7 +5,8 @@ sidebar_position: 4
 
 <!--
   Filtros: o período é escolhido em dois seletores de mês (de/até); os demais aceitam vários
-  valores e começam com tudo marcado. Todas as consultas abaixo partem de `filtrado`.
+  valores e começam com tudo marcado. As consultas partem de `base`: com o canal "Todos",
+  as tabelas por categoria; com um canal, as listas daquele canal (veiculos.modelos_canal).
 -->
 
 ```sql meses_crescente
@@ -27,19 +28,36 @@ order by nome
 ```
 
 ```sql opcoes_carroceria
-select distinct carroceria from veiculos.modelos order by carroceria
+-- Com as listas por canal: modelos que nunca aparecem nas tabelas por categoria ficam "Não classificado"
+select distinct carroceria from veiculos.modelos
+union
+select distinct carroceria from veiculos.modelos_canal
+order by carroceria
 ```
 
 ```sql opcoes_categoria
-select distinct categoria from veiculos.modelos order by categoria
+select distinct categoria from veiculos.modelos
+union
+select distinct categoria from veiculos.modelos_canal
+order by categoria
 ```
 
 ```sql opcoes_marca
-select marca, sum(emplacamentos) as total from veiculos.modelos group by marca order by total desc
+select marca, sum(total) as total
+from (
+    select marca, sum(emplacamentos) as total from veiculos.modelos group by marca
+    union all
+    select marca, 0 from veiculos.modelos_canal group by marca
+)
+group by marca
+order by total desc, marca
 ```
 
 ```sql opcoes_origem
-select distinct origem from veiculos.modelos order by origem
+select distinct origem from veiculos.modelos
+union
+select distinct origem from veiculos.modelos_canal
+order by origem
 ```
 
 ```sql meses
@@ -52,14 +70,34 @@ order by mes desc
 ```
 
 ```sql opcoes_modelo
-select modelo_completo as modelo, sum(emplacamentos) as total
-from veiculos.modelos
-group by modelo_completo
-order by total desc
+select modelo, sum(total) as total
+from (
+    select modelo_completo as modelo, sum(emplacamentos) as total from veiculos.modelos group by all
+    union all
+    select modelo_completo, 0 from veiculos.modelos_canal group by all
+)
+group by modelo
+order by total desc, modelo
+```
+
+```sql base
+-- Canal "Todos": as tabelas por categoria. Varejo ou venda direta: as listas do canal
+select mes_referencia, ano, segmento, marca, pais_origem, origem, modelo_completo, categoria, carroceria, emplacamentos
+from veiculos.modelos_mensal
+where '${inputs.canal}' = 'todos'
+union all
+select mes_referencia, ano, segmento, marca, pais_origem, origem, modelo_completo, categoria, carroceria, emplacamentos
+from veiculos.modelos_canal
+where canal = '${inputs.canal}'
 ```
 
 <Dropdown data={meses_crescente} name=inicio value=mes label=mes_nome order=mes title="De (mês/ano)" />
 <Dropdown data={meses_decrescente} name=fim value=mes label=mes_nome order="mes desc" title="Até (mês/ano)" />
+<ButtonGroup name=canal title="Canal">
+    <ButtonGroupItem valueLabel="Todos" value="todos" default />
+    <ButtonGroupItem valueLabel="Varejo" value="varejo" />
+    <ButtonGroupItem valueLabel="Venda direta" value="venda_direta" />
+</ButtonGroup>
 <Dropdown data={opcoes_segmento} name=segmento value=segmento label=nome title="Segmento" multiple=true selectAllByDefault=true />
 <Dropdown data={opcoes_carroceria} name=carroceria value=carroceria title="Carroceria" multiple=true selectAllByDefault=true />
 <Dropdown data={opcoes_categoria} name=categoria value=categoria title="Categoria" multiple=true selectAllByDefault=true />
@@ -79,7 +117,7 @@ select
     carroceria,
     mes_referencia,
     emplacamentos
-from veiculos.modelos_mensal
+from ${base}
 where strftime(mes_referencia, '%Y-%m') between '${inputs.inicio.value}' and '${inputs.fim.value}'
   and segmento in ${inputs.segmento.value}
   and carroceria in ${inputs.carroceria.value}
@@ -117,7 +155,7 @@ order by emplacamentos desc
 -- Todos os modelos listados no mês escolhido (com os filtros), e o mesmo mês do ano anterior
 with mes as (
     select *
-    from veiculos.modelos_mensal
+    from ${base}
     where strftime(mes_referencia, '%Y-%m') = '${inputs.mes.value}'
       and segmento in ${inputs.segmento.value}
       and carroceria in ${inputs.carroceria.value}
@@ -127,7 +165,7 @@ with mes as (
 ),
 ano_anterior as (
     select modelo_completo, sum(emplacamentos) as emplacamentos
-    from veiculos.modelos_mensal
+    from ${base}
     where strftime(mes_referencia + interval 1 year, '%Y-%m') = '${inputs.mes.value}'
     group by modelo_completo
 )
@@ -147,7 +185,7 @@ order by posicao
 ```
 
 ```sql escolhidos
-select distinct modelo_completo as modelo from veiculos.modelos where modelo_completo in ${inputs.comparar.value}
+select distinct modelo from ${opcoes_modelo} where modelo in ${inputs.comparar.value}
 ```
 
 ```sql comparativo
@@ -162,7 +200,7 @@ select
     mes_referencia + interval 12 hour   as mes,
     modelo_completo                     as modelo,
     sum(emplacamentos)                  as emplacamentos
-from veiculos.modelos_mensal
+from ${base}
 where strftime(mes_referencia, '%Y-%m') between '${inputs.inicio.value}' and '${inputs.fim.value}'
   and modelo_completo in (select modelo from lista)
 group by all
@@ -203,7 +241,7 @@ select
 
 ## Todos os modelos do período
 
-Todos os modelos listados pela Fenabrave no período e nos filtros escolhidos. Use a busca da tabela para achar um modelo pelo nome.
+Todos os modelos listados pela Fenabrave no período e nos filtros escolhidos (no canal escolhido, se houver). Use a busca da tabela para achar um modelo pelo nome.
 
 <DataTable data={ranking} rows=25 search=true>
     <Column id=posicao title="#" />
@@ -275,5 +313,7 @@ Os SUVs eram <Value data={suv} column=em_2010 fmt=pct0 /> dos leves em 2010 e ch
 <Alert status="info">
 
 A Fenabrave lista os modelos mais emplacados de cada categoria, não todos. Por isso, o total de um modelo no ano é um **piso**: se ele ficou fora da lista em algum mês, aquele mês não entra, e modelos de volume muito baixo podem nem aparecer. O ano mais recente ainda está em andamento, e 2003 e 2005 têm um mês sem a tabela de modelos.
+
+**Filtro de canal:** com "Varejo" ou "Venda direta", os números vêm das listas por canal da Fenabrave: os ~50 automóveis e ~40 comerciais leves mais emplacados no mês em cada canal, que cobrem de 88% a 100% do canal. Essas listas não trazem a categoria, que vem das tabelas por categoria; modelos que nunca aparecem nelas ficam como "Não classificado". Out/2003, mar/2005 e set/2023 não têm as listas por canal. A Fenabrave não mede o atacado (venda da montadora para a concessionária), que é dado da Anfavea.
 
 </Alert>

@@ -90,6 +90,29 @@ def conferir_relatorio(r: dict) -> list[str]:
             esperado = (direta["automoveis"] * segmentos["automoveis"] + direta["comerciais_leves"] * segmentos["comerciais_leves"]) / segmentos["leves"]
             if abs(esperado - direta["leves"]) > Decimal("1.0"):
                 problemas.append(f"{mes}: % de venda direta de leves ({direta['leves']}) não bate com a média dos segmentos ({esperado:.2f})")
+            problemas += _conferir_modelos_por_canal(mes, r.get("fenabrave_modelos_canal") or [], segmentos, canal)
+    return problemas
+
+
+def _conferir_modelos_por_canal(mes: str, linhas: list[dict], segmentos: dict, canal: dict) -> list[str]:
+    """Os modelos de cada canal são um top N: a soma não pode passar das unidades do canal
+    (total do segmento × % do canal), com folga de 1% do segmento pelo arredondamento do %."""
+    problemas = []
+    soma = defaultdict(int)
+    posicoes = defaultdict(list)
+    for linha in linhas:
+        chave = (linha["canal"], linha["segmento"])
+        soma[chave] += inteiro(linha["quantidade"])
+        posicoes[chave].append(int(linha["posicao"]))
+    for (nome_canal, segmento), unidades in soma.items():
+        if segmento not in segmentos:
+            continue
+        pct = Decimal(canal[segmento]["venda_direta_pct" if nome_canal == "venda_direta" else "varejo_pct"])
+        limite = segmentos[segmento] * pct / 100 + segmentos[segmento] * Decimal("0.01")
+        if unidades > limite:
+            problemas.append(f"{mes}: modelos de {segmento} em {nome_canal} somam {unidades}, mais que o canal (~{limite:.0f})")
+        if posicoes[(nome_canal, segmento)] != list(range(1, len(posicoes[(nome_canal, segmento)]) + 1)):
+            problemas.append(f"{mes}: posições fora de ordem nos modelos de {segmento} em {nome_canal}")
     return problemas
 
 
