@@ -14,11 +14,6 @@ select strftime(mes_referencia, '%Y-%m') as mes, strftime(mes_referencia, '%m/%Y
 from veiculos.mensal where segmento = 'leves' order by mes
 ```
 
-```sql meses_decrescente
-select strftime(mes_referencia, '%Y-%m') as mes, strftime(mes_referencia, '%m/%Y') as mes_nome
-from veiculos.mensal where segmento = 'leves' order by mes desc
-```
-
 ```sql inicio_padrao
 -- Últimos 12 meses
 select strftime(max(mes_referencia) - interval 11 month, '%Y-%m') as mes
@@ -45,8 +40,8 @@ group by marca
 order by total desc nulls last, marca
 ```
 
-<Dropdown data={meses_crescente} name=inicio value=mes label=mes_nome order=mes title="De" defaultValue={inicio_padrao[0]?.mes} />
-<Dropdown data={meses_decrescente} name=fim value=mes label=mes_nome order="mes desc" title="Até" />
+<PeriodoSlider data={meses_crescente} padrao={inicio_padrao[0]?.mes} />
+
 <ButtonGroup name=segmento>
     <ButtonGroupItem valueLabel="Leves" value="leves" default />
     <ButtonGroupItem valueLabel="Automóveis" value="automoveis" />
@@ -239,6 +234,7 @@ select
         x=mes
         y=emplacamentos
         series=marca
+        lineWidth=2.5
         yFmt='#,##0'
         title={periodo[0]?.anual ? 'Emplacamentos (média mensal do ano)' : 'Emplacamentos por mês'}
     />
@@ -247,6 +243,7 @@ select
         x=mes
         y=participacao
         series=marca
+        lineWidth=2.5
         yFmt=pct0
         title="Participação"
     />
@@ -254,8 +251,12 @@ select
 
 ## Quem ganha e quem perde espaço
 
-<BigValue data={destaques} value=quatro_agora title="Fiat, VW, GM e Ford hoje" fmt=pct0 comparison=quatro_desde_2003 comparisonFmt=pct0 comparisonTitle="pontos desde 2003" />
-<BigValue data={destaques} value=china_agora title="Marcas chinesas hoje" fmt=pct1 comparison=china_desde_2020 comparisonFmt=pct1 comparisonTitle="pontos desde 2020" />
+<div class="kpis">
+
+<BigValue titleClass="titulo-kpi" valueClass="valor-grande" data={destaques} value=quatro_agora title="Fiat, VW, GM e Ford hoje" fmt=pct0 comparison=quatro_desde_2003 comparisonFmt=pct0 comparisonTitle="pontos desde 2003" />
+<BigValue titleClass="titulo-kpi" valueClass="valor-grande" data={destaques} value=china_agora title="Marcas chinesas hoje" fmt=pct1 comparison=china_desde_2020 comparisonFmt=pct1 comparisonTitle="pontos desde 2020" />
+
+</div>
 
 <BarChart
     data={origem_por_ano}

@@ -8,13 +8,8 @@ select strftime(mes_referencia, '%Y-%m') as mes, strftime(mes_referencia, '%m/%Y
 from veiculos.mensal where segmento = 'leves' order by mes
 ```
 
-```sql meses_decrescente
-select strftime(mes_referencia, '%Y-%m') as mes, strftime(mes_referencia, '%m/%Y') as mes_nome
-from veiculos.mensal where segmento = 'leves' order by mes desc
-```
+<PeriodoSlider data={meses_crescente} />
 
-<Dropdown data={meses_crescente} name=inicio value=mes label=mes_nome order=mes title="De" />
-<Dropdown data={meses_decrescente} name=fim value=mes label=mes_nome order="mes desc" title="Até" />
 <ButtonGroup name=segmento>
     <ButtonGroupItem valueLabel="Leves" value="leves" default />
     <ButtonGroupItem valueLabel="Automóveis" value="automoveis" />
@@ -125,7 +120,7 @@ Depois do pico de <Value data={pico_e_vale} column=ano_pico fmt='0' /> o mercado
     sort=false
     yFmt=pct0
     title="Variação sobre o ano anterior"
-    colorPalette={['#2f855a', '#c53030']}
+    seriesColors={{'Alta': 'positive', 'Queda': 'negative'}}
 />
 
 <LineChart
@@ -135,6 +130,9 @@ Depois do pico de <Value data={pico_e_vale} column=ano_pico fmt='0' /> o mercado
     series=serie
     yFmt='#,##0'
     title="Emplacamentos por mês e média de 12 meses"
+    seriesColors={{'Emplacamentos no mês': 'base-content-muted', 'Média móvel de 12 meses': 'accent'}}
+    lineWidth=2.5
+    chartAreaHeight=260
 />
 
 ## Automóveis e comerciais leves
@@ -162,4 +160,5 @@ Em um ano típico, <Value data={meses_extremos} column=mes_forte /> fica <Value 
     sort=false
     yFmt='#,##0.00'
     title="Peso de cada mês (1,00 = mês médio)"
+    seriesOptions={{itemStyle: {borderRadius: [5, 5, 0, 0]}}}
 />

@@ -8,13 +8,8 @@ select strftime(mes_referencia, '%Y-%m') as mes, strftime(mes_referencia, '%m/%Y
 from veiculos.mensal where segmento = 'leves' order by mes
 ```
 
-```sql meses_decrescente
-select strftime(mes_referencia, '%Y-%m') as mes, strftime(mes_referencia, '%m/%Y') as mes_nome
-from veiculos.mensal where segmento = 'leves' order by mes desc
-```
+<PeriodoSlider data={meses_crescente} />
 
-<Dropdown data={meses_crescente} name=inicio value=mes label=mes_nome order=mes title="De" />
-<Dropdown data={meses_decrescente} name=fim value=mes label=mes_nome order="mes desc" title="Até" />
 <ButtonGroup name=segmento>
     <ButtonGroupItem valueLabel="Leves" value="leves" default />
     <ButtonGroupItem valueLabel="Automóveis" value="automoveis" />
@@ -74,7 +69,11 @@ select
 
 Venda direta é o que a montadora fatura direto para locadoras, frotistas, PcD, produtores rurais e governo; o resto é varejo.
 
-<BigValue data={destaques} value=ultimo_ano_completo title="Venda direta no último ano completo" fmt=pct0 comparison=desde_2012 comparisonFmt=pct0 comparisonTitle="pontos desde 2012" />
+<div class="kpis">
+
+<BigValue titleClass="titulo-kpi" valueClass="valor-grande" data={destaques} value=ultimo_ano_completo title="Venda direta no último ano completo" fmt=pct0 comparison=desde_2012 comparisonFmt=pct0 comparisonTitle="pontos desde 2012" />
+
+</div>
 
 <LineChart
     data={participacao_por_segmento}
@@ -84,6 +83,8 @@ Venda direta é o que a montadora fatura direto para locadoras, frotistas, PcD, 
     series=segmento
     yFmt=pct0
     title="Venda direta, % dos emplacamentos"
+    lineWidth=3
+    chartAreaHeight=240
 />
 
 <BarChart
@@ -95,7 +96,7 @@ Venda direta é o que a montadora fatura direto para locadoras, frotistas, PcD, 
     sort=false
     yFmt='#,##0'
     title="Emplacamentos por canal"
-    colorPalette={['#d1495b', '#1d4e89']}
+    seriesColors={{'Venda direta': 'accent', 'Varejo': 'primary'}}
 />
 
 <Alert status="info">

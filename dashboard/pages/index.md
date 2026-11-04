@@ -34,10 +34,14 @@ order by ano
 
 Emplacamentos de automóveis e comerciais leves novos no Brasil, desde 2003. Fonte: Fenabrave. Dados até <Value data={resumo} column=ultimo_mes_txt />
 
-<BigValue data={resumo} value=emplacamentos_ultimo_mes title="Último mês" fmt='#,##0' comparison=variacao_ultimo_mes comparisonFmt=pct1 comparisonTitle="vs. ano anterior" />
-<BigValue data={resumo} value=emplacamentos_acumulado_ano title="Acumulado do ano" fmt='#,##0' comparison=variacao_acumulado_ano comparisonFmt=pct1 comparisonTitle="vs. ano anterior" />
-<BigValue data={resumo} value=venda_direta_ultimo_mes title="Venda direta no mês" fmt=pct1 />
-<BigValue data={resumo} value=participacao_marca_lider title={`${resumo[0]?.marca_lider_ultimo_mes ?? 'Marca líder'} no mês`} fmt=pct1 />
+<div class="kpis">
+
+<BigValue titleClass="titulo-kpi" valueClass="valor-grande" data={resumo} value=emplacamentos_ultimo_mes title="Último mês" fmt='#,##0' comparison=variacao_ultimo_mes comparisonFmt=pct1 comparisonTitle="vs. ano anterior" />
+<BigValue titleClass="titulo-kpi" valueClass="valor-grande" data={resumo} value=emplacamentos_acumulado_ano title="Acumulado do ano" fmt='#,##0' comparison=variacao_acumulado_ano comparisonFmt=pct1 comparisonTitle="vs. ano anterior" />
+<BigValue titleClass="titulo-kpi" valueClass="valor-grande" data={resumo} value=venda_direta_ultimo_mes title="Venda direta no mês" fmt=pct1 />
+<BigValue titleClass="titulo-kpi" valueClass="valor-grande" data={resumo} value=participacao_marca_lider title={`${resumo[0]?.marca_lider_ultimo_mes ?? 'Marca líder'} no mês`} fmt=pct1 />
+
+</div>
 
 <BarChart
     data={anual}
@@ -49,5 +53,7 @@ Emplacamentos de automóveis e comerciais leves novos no Brasil, desde 2003. Fon
     yFmt='#,##0.0" mi"'
     title="Emplacamentos por ano"
     subtitle="Recorde em 2012; quedas na recessão de 2015–2016 e na pandemia"
-    colorPalette={['#1d4e89', '#9bb7d9']}
+    seriesColors={{'Ano completo': 'primary', 'Ano em andamento': 'base-content-muted'}}
+    seriesOptions={{itemStyle: {borderRadius: [5, 5, 0, 0]}}}
+    chartAreaHeight=280
 />

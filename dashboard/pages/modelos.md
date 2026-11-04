@@ -14,11 +14,6 @@ select strftime(mes_referencia, '%Y-%m') as mes, strftime(mes_referencia, '%m/%Y
 from veiculos.mensal where segmento = 'leves' order by mes
 ```
 
-```sql meses_decrescente
-select strftime(mes_referencia, '%Y-%m') as mes, strftime(mes_referencia, '%m/%Y') as mes_nome
-from veiculos.mensal where segmento = 'leves' order by mes desc
-```
-
 ```sql opcoes_segmento
 select distinct
     segmento,
@@ -95,8 +90,8 @@ from veiculos.modelos_canal
 where canal = '${inputs.canal}'
 ```
 
-<Dropdown data={meses_crescente} name=inicio value=mes label=mes_nome order=mes title="De" defaultValue={inicio_padrao[0]?.mes} />
-<Dropdown data={meses_decrescente} name=fim value=mes label=mes_nome order="mes desc" title="Até" />
+<PeriodoSlider data={meses_crescente} padrao={inicio_padrao[0]?.mes} />
+
 <ButtonGroup name=canal>
     <ButtonGroupItem valueLabel="Todos os canais" value="todos" default />
     <ButtonGroupItem valueLabel="Varejo" value="varejo" />
@@ -248,13 +243,19 @@ select
     x=mes
     y=emplacamentos
     series=modelo
+    lineWidth=2.5
+    chartAreaHeight=260
     yFmt='#,##0'
     title={periodo[0]?.anual ? 'Emplacamentos (média mensal do ano)' : 'Emplacamentos por mês'}
 />
 
 ## O avanço dos SUVs
 
-<BigValue data={suv} value=agora title="SUVs nos leves" fmt=pct0 comparison=desde_2010 comparisonFmt=pct0 comparisonTitle="pontos desde 2010" />
+<div class="kpis">
+
+<BigValue titleClass="titulo-kpi" valueClass="valor-grande" data={suv} value=agora title="SUVs nos leves" fmt=pct0 comparison=desde_2010 comparisonFmt=pct0 comparisonTitle="pontos desde 2010" />
+
+</div>
 
 <BarChart
         data={carroceria_por_ano}
@@ -265,6 +266,7 @@ select
         type=stacked100
         sort=false
         title="Participação de cada carroceria, desde 2003"
+        seriesColors={{'SUV': 'accent', 'Hatch': 'primary', 'Sedã': '#7c4dde', 'Picape': '#0f9f9a', 'Perua': '#b9c0cc', 'Minivan': '#e0b44c', 'Furgão': '#8f99aa', 'Esportivo': '#5b6678'}}
     />
 
 <DataTable data={lideres} rows=10 title="Mais emplacado de cada ano">
